@@ -23,6 +23,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Inspect NASA map implementation
+        run: |
+          python - <<'PY'
+          import urllib.request, re
+          url='https://eclipse.gsfc.nasa.gov/SEsearch/SEsearchmap.php?Ecl=20260812'
+          html=urllib.request.urlopen(url, timeout=30).read().decode('utf-8','replace')
+          print('HTML_LENGTH', len(html))
+          print('SCRIPTS')
+          for src in re.findall(r'<script[^>]+src=["\']([^"\']+)', html, re.I): print(src)
+          print('FETCH_OR_PHP_REFERENCES')
+          for x in sorted(set(re.findall(r'[A-Za-z0-9_./-]+(?:\.php|\.js)(?:\?[^"\'\s<]*)?', html))): print(x)
+          print('FETCH_LINES')
+          for line in html.splitlines():
+              if 'fetch(' in line or 'XMLHttpRequest' in line or 'path' in line.lower() and ('php' in line or 'json' in line):
+                  print(line[:1000])
+          PY
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
