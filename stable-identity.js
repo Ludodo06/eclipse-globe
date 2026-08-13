@@ -1,67 +1,154 @@
 (() => {
-  const THREE_URL='https://cdn.jsdelivr.net/npm/three@0.161.0/+esm';
-  const version=(()=>{try{return new URL(document.currentScript?.src||location.href).searchParams.get('v')||Date.now()}catch{return Date.now()}})();
-  const CATALOG_URL=`./data/nasa-total-eclipses.json?v=${version}`;
-  const specialOld={'20260812':'#9b6cff','20270802':'#ff8a3d'};
-  const specialVivid={'20260812':'#b45cff','20270802':'#ff7a1a'};
-  const state={THREE:null,catalog:[],byColor:new Map(),ready:false,globe:null,lastItems:[]};
+  const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.161.0/+esm';
+  const version = (() => {
+    try { return new URL(document.currentScript?.src || location.href).searchParams.get('v') || Date.now(); }
+    catch { return Date.now(); }
+  })();
+  const CATALOG_URL = `./data/nasa-total-eclipses.json?v=${version}`;
+  const SPECIAL = {
+    '20260812': '#9b6cff',
+    '20270802': '#ff8a3d'
+  };
 
-  function hashString(value){let h=2166136261;for(const c of String(value||'eclipse')){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0)}
-  function oldStyle(meta){if(specialOld[meta.nasaId])return specialOld[meta.nasaId];const n=Number(meta.catalogNumber)||hashString(meta.id);const hue=(n*137.50776405)%360;return `hsl(${hue.toFixed(1)} ${72+(n%13)}% ${48+(n%9)}%)`}
-  function vivid(meta){const c=new state.THREE.Color();if(specialVivid[meta.nasaId])return c.set(specialVivid[meta.nasaId]);const n=Number(meta.catalogNumber)||hashString(meta.id);return c.setHSL(((n*137.50776405)%360)/360,.96,[.56,.62,.68][Math.abs(n)%3])}
-  function key(r,g,b){return `${Math.round(r*1e6)},${Math.round(g*1e6)},${Math.round(b*1e6)}`}
-  function arrayKey(a,v){const o=v*3;return key(a[o],a[o+1],a[o+2])}
+  const state = {
+    THREE: null,
+    catalog: [],
+    byColor: new Map(),
+    ready: false
+  };
 
-  function segments(alpha,count){
-    if(!alpha||count<4)return[{start:0,end:count}];
-    const starts=[0],pairs=Math.floor(count/2);
-    for(let p=1;p<pairs;p++)if(Math.abs(alpha.getX((p-1)*2))<=1e-5&&Math.abs(alpha.getX(p*2))<=1e-5)starts.push(p*2);
-    return starts.map((start,i)=>({start,end:i+1<starts.length?starts[i+1]:count})).filter(s=>s.end-s.start>=4);
+  function hashString(value) {
+    let hash = 2166136261;
+    for (const char of String(value || 'eclipse')) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash >>> 0);
   }
 
-  function capture(items){
-    for(const item of items||[]){
-      if(item?.kind!=='ribbons')continue;
-      const g=item.mesh?.geometry,c=g?.getAttribute?.('aColor');
-      if(!g||!c)continue;
-      g.userData=g.userData||{};
-      if(!g.userData.stableOriginalColors){const original=g.userData.eclipseOriginalColors;g.userData.stableOriginalColors=original?new Float32Array(original):new Float32Array(c.array)}
+  function originalStyle(meta) {
+    if (SPECIAL[meta.nasaId]) return SPECIAL[meta.nasaId];
+    const n = meta.catalogNumber || hashString(meta.id);
+    const hue = (n * 137.50776405) % 360;
+    const saturation = 72 + (n % 13);
+    const lightness = 48 + (n % 9);
+    return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`;
+  }
+
+  function colorKey(r, g, b) {
+    return `${Math.round(r * 1000000)},${Math.round(g * 1000000)},${Math.round(b * 1000000)}`;
+  }
+
+  function vertexColorKey(array, vertex) {
+    const offset = vertex * 3;
+    return colorKey(array[offset], array[offset + 1], array[offset + 2]);
+  }
+
+  function segmentRanges(alpha, vertexCount) {
+    if (!alpha || vertexCount < 4) return [{ start: 0, end: vertexCount }];
+    const starts = [0];
+    const pairs = Math.floor(vertexCount / 2);
+    for (let pair = 1; pair < pairs; pair += 1) {
+      const previous = alpha.getX((pair - 1) * 2);
+      const current = alpha.getX(pair * 2);
+      if (Math.abs(previous) <= 1e-5 && Math.abs(current) <= 1e-5) {
+        starts.push(pair * 2);
+      }
+    }
+    return starts.map((start, index) => ({
+      start,
+      end: index + 1 < starts.length ? starts[index + 1] : vertexCount
+    })).filter(segment => segment.end - segment.start >= 4);
+  }
+
+  function snapshot(items) {
+    const snapshots = new Map();
+    for (const item of items || []) {
+      if (item?.kind !== 'ribbons') continue;
+      const geometry = item.mesh?.geometry;
+      const color = geometry?.getAttribute?.('aColor');
+      if (!geometry || !color) continue;
+      snapshots.set(geometry.uuid, new Float32Array(color.array));
+    }
+    return snapshots;
+  }
+
+  function identifyFromRawColor(raw, vertex) {
+    return state.byColor.get(vertexColorKey(raw, vertex)) || null;
+  }
+
+  function writeIdentity(items, snapshots) {
+    if (!state.ready || !state.THREE) return;
+
+    for (const item of items || []) {
+      if (item?.kind !== 'ribbons') continue;
+      const geometry = item.mesh?.geometry;
+      const color = geometry?.getAttribute?.('aColor');
+      const alpha = geometry?.getAttribute?.('aAlpha');
+      const raw = geometry ? snapshots.get(geometry.uuid) : null;
+      if (!geometry || !color || !raw) continue;
+
+      const keys = new Float32Array(color.count);
+      for (const segment of segmentRanges(alpha, color.count)) {
+        const meta = identifyFromRawColor(raw, segment.start);
+        if (!meta) continue;
+        for (let vertex = segment.start; vertex < segment.end; vertex += 1) {
+          keys[vertex] = meta._hoverKey;
+        }
+      }
+
+      geometry.setAttribute('aEclipseKey', new state.THREE.Float32BufferAttribute(keys, 1));
+      geometry.getAttribute('aEclipseKey').needsUpdate = true;
     }
   }
 
-  function closest(original,start){
-    const exact=state.byColor.get(arrayKey(original,start));
-    if(exact)return exact;
-    const o=start*3,r=original[o],g=original[o+1],b=original[o+2];
-    let best=null,dBest=Infinity;
-    for(const meta of state.catalog){const t=meta._oldColor,dr=r-t.r,dg=g-t.g,db=b-t.b,d=dr*dr+dg*dg+db*db;if(d<dBest){dBest=d;best=meta}}
-    return best;
+  function attach(globe) {
+    if (!globe || globe.__atomicEclipseIdentity) return;
+    globe.__atomicEclipseIdentity = true;
+
+    const previous = globe.customLayerData.bind(globe);
+    globe.customLayerData = function atomicCustomLayerData(value) {
+      if (!arguments.length) return previous();
+      const items = Array.isArray(value) ? value : [];
+      const raw = snapshot(items);
+      const result = previous(value);
+      writeIdentity(items, raw);
+      return result;
+    };
   }
 
-  function patch(mesh){
-    if(!state.ready)return;
-    const g=mesh?.geometry,c=g?.getAttribute?.('aColor'),a=g?.getAttribute?.('aAlpha');
-    const original=g?.userData?.stableOriginalColors||g?.userData?.eclipseOriginalColors;
-    if(!g||!c||!original)return;
-    const ks=new Float32Array(c.count);
-    for(const s of segments(a,c.count)){
-      const meta=closest(original,s.start);if(!meta)continue;
-      const col=vivid(meta);
-      for(let v=s.start;v<s.end;v++){ks[v]=meta._hoverKey;c.setXYZ(v,col.r,col.g,col.b)}
+  function waitForGlobe() {
+    if (window.eclipseGlobeInstance) {
+      attach(window.eclipseGlobeInstance);
+      return;
     }
-    g.setAttribute('aEclipseKey',new state.THREE.Float32BufferAttribute(ks,1));
-    c.needsUpdate=true;g.getAttribute('aEclipseKey').needsUpdate=true;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+      if (window.eclipseGlobeInstance) {
+        clearInterval(timer);
+        attach(window.eclipseGlobeInstance);
+      } else if (attempts > 120) {
+        clearInterval(timer);
+      }
+    }, 50);
   }
 
-  function patchItems(items=state.lastItems){capture(items);for(const item of items||[])if(item?.kind==='ribbons')patch(item.mesh)}
-  function schedule(items){state.lastItems=Array.isArray(items)?items:[];capture(state.lastItems);queueMicrotask(()=>patchItems());setTimeout(()=>patchItems(),0);setTimeout(()=>patchItems(),50);setTimeout(()=>patchItems(),150)}
-  function attach(globe){if(!globe||globe.__exactEclipseIdentity)return;globe.__exactEclipseIdentity=true;state.globe=globe;const previous=globe.customLayerData.bind(globe);globe.customLayerData=function(value){if(!arguments.length)return previous();const items=Array.isArray(value)?value:[];capture(items);const out=previous(value);schedule(items);return out};try{const current=globe.customLayerData();if(Array.isArray(current))schedule(current)}catch{}}
-  function wait(){if(window.eclipseGlobeInstance)return attach(window.eclipseGlobeInstance);let n=0;const timer=setInterval(()=>{if(window.eclipseGlobeInstance){clearInterval(timer);attach(window.eclipseGlobeInstance)}else if(++n>100)clearInterval(timer)},50)}
+  Promise.all([
+    import(THREE_URL),
+    fetch(CATALOG_URL, { cache: 'no-store' })
+  ]).then(async ([THREE, response]) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    state.THREE = THREE;
+    state.catalog = (data.eclipses || []).map((meta, index) => ({ ...meta, _hoverKey: index + 1 }));
 
-  Promise.all([import(THREE_URL),fetch(CATALOG_URL,{cache:'no-store'})]).then(async([THREE,response])=>{
-    if(!response.ok)throw new Error(`HTTP ${response.status}`);const data=await response.json();
-    state.THREE=THREE;state.catalog=(data.eclipses||[]).map((meta,index)=>({...meta,_hoverKey:index+1}));
-    for(const meta of state.catalog){meta._oldColor=new THREE.Color(oldStyle(meta));state.byColor.set(key(meta._oldColor.r,meta._oldColor.g,meta._oldColor.b),meta)}
-    state.ready=true;wait();if(state.globe)patchItems();
-  }).catch(error=>console.warn('Identité stable des éclipses indisponible :',error));
+    for (const meta of state.catalog) {
+      const color = new THREE.Color(originalStyle(meta));
+      state.byColor.set(colorKey(color.r, color.g, color.b), meta);
+    }
+
+    state.ready = true;
+    waitForGlobe();
+  }).catch(error => console.warn('Identité des éclipses indisponible :', error));
 })();
