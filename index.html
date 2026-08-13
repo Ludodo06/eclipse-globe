@@ -17,34 +17,63 @@
     button:disabled { opacity:.45; cursor:not-allowed; }
     select,input[type="search"] { width:100%; min-width:0; }
 
-    .panel { position:absolute; z-index:3; top:max(14px,env(safe-area-inset-top)); height:calc(100% - 28px); min-height:0; border:1px solid rgba(255,255,255,.13); border-radius:16px; background:rgba(7,12,20,.90); backdrop-filter:blur(18px); box-shadow:0 18px 64px rgba(0,0,0,.38); }
-    .panel-left { left:max(14px,env(safe-area-inset-left)); width:min(440px,calc(50vw - 26px)); display:flex; flex-direction:column; overflow:hidden; }
-    .panel-right { right:max(14px,env(safe-area-inset-right)); width:min(350px,calc(42vw - 26px)); overflow-y:auto; scrollbar-width:thin; }
+    .panel {
+      position:absolute; z-index:7; top:max(14px,env(safe-area-inset-top)); bottom:max(14px,env(safe-area-inset-bottom));
+      min-height:0; border:1px solid rgba(255,255,255,.13); border-radius:16px;
+      background:rgba(7,12,20,.92); backdrop-filter:blur(18px); box-shadow:0 18px 64px rgba(0,0,0,.38);
+      opacity:0; visibility:hidden; pointer-events:none;
+      transition:transform .2s ease,opacity .16s ease,visibility .16s ease;
+    }
+    .panel-left {
+      left:max(14px,env(safe-area-inset-left)); width:min(440px,calc(50vw - 26px));
+      display:grid; grid-template-rows:auto minmax(0,1fr); overflow:hidden;
+      transform:translateX(calc(-100% - 28px));
+    }
+    .panel-right {
+      right:max(14px,env(safe-area-inset-right)); width:min(350px,calc(42vw - 26px));
+      overflow-y:auto; scrollbar-width:thin; transform:translateX(calc(100% + 28px));
+    }
+    .panel.panel-open { transform:translateX(0) !important; opacity:1; visibility:visible; pointer-events:auto; }
     .panel-pad { padding:14px; }
     .panel-kicker { margin:0 0 3px; color:#7e91a8; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     h1 { margin:0 0 4px; font-size:20px; }
     h2 { margin:0; font-size:16px; }
     .subtitle { margin:0; color:#93a3b7; font-size:11px; line-height:1.4; }
-    .selection-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-    .selection-header > div { min-width:0; }
-    .mobile-panel-close { display:none; flex:0 0 auto; }
+    .selection-header,.right-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .selection-header > div,.right-header > div { min-width:0; }
+    .right-header { align-items:center; margin-bottom:10px; }
+    .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; flex:0 0 auto; font-size:17px; }
 
-    details.catalog { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; border-top:1px solid rgba(255,255,255,.08); }
-    details.catalog:not([open]) { flex:0 0 auto; }
-    details.catalog > summary { flex:0 0 auto; list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; font-size:11px; font-weight:760; background:rgba(255,255,255,.025); }
+    /* Le catalogue utilise une vraie grille à hauteur bornée : seule la liste scrolle. */
+    details.catalog[open] {
+      display:grid !important; grid-template-rows:auto minmax(0,1fr) !important;
+      min-height:0 !important; overflow:hidden !important; border-top:1px solid rgba(255,255,255,.08);
+    }
+    details.catalog:not([open]) { display:block !important; min-height:0; }
+    details.catalog > summary {
+      list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:10px 14px; font-size:11px; font-weight:760; background:rgba(255,255,255,.025);
+    }
     details.catalog > summary::-webkit-details-marker { display:none; }
     details.catalog > summary::after { content:"▾"; color:#8fa0b5; }
     details.catalog:not([open]) > summary::after { transform:rotate(-90deg); }
     .summary-text { display:flex; flex-direction:column; gap:2px; }
     .summary-text small { color:#7f91a7; font-size:9.5px; font-weight:500; }
-    .catalog-body { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; overflow:hidden; padding:0 10px 10px; }
-    .catalog-toolbar { flex:0 0 auto; display:grid; gap:7px; padding:10px 0 8px; }
+    .catalog-body {
+      display:grid !important; grid-template-rows:auto minmax(0,1fr) auto auto !important;
+      min-height:0 !important; overflow:hidden !important; padding:0 10px 10px;
+    }
+    .catalog-toolbar { min-height:0; display:grid; gap:7px; padding:10px 0 8px; }
     .filter-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.45fr); gap:7px; }
     .bulk-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
     .continent-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
-    .catalog-list { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-gutter:stable; display:grid; align-content:start; gap:6px; padding-right:2px; }
-    .catalog-hint { flex:0 0 auto; margin:7px 2px 0; color:#788ba2; font-size:9px; line-height:1.4; }
-    #loadMoreBtn { flex:0 0 auto; width:100%; margin-top:7px; }
+    .catalog-list {
+      min-height:0 !important; height:100% !important; overflow-y:auto !important; overflow-x:hidden !important;
+      overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-gutter:stable;
+      display:grid; align-content:start; gap:6px; padding-right:4px;
+    }
+    .catalog-hint { margin:7px 2px 0; color:#788ba2; font-size:9px; line-height:1.4; }
+    #loadMoreBtn { width:100%; margin-top:7px; }
 
     .eclipse-option { display:grid; grid-template-columns:20px 11px minmax(0,1fr); gap:9px; align-items:center; padding:8px 9px; border:1px solid transparent; border-radius:9px; background:rgba(255,255,255,.048); cursor:pointer; }
     .eclipse-option:hover { background:rgba(255,255,255,.078); }
@@ -62,8 +91,6 @@
     .group-show-btn { width:100%; margin-bottom:7px; font-size:10px; padding:7px; }
     .group-rows { display:grid; gap:6px; }
 
-    .right-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-    .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; }
     .info-card,.visible-card,.settings-card,.stats-card { border:1px solid rgba(255,255,255,.09); border-radius:11px; background:rgba(255,255,255,.04); }
     .info-card { padding:11px; min-height:170px; }
     .info-empty { color:#8fa0b5; font-size:11px; line-height:1.5; }
@@ -110,44 +137,27 @@
     .status { margin-top:9px; padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.04); color:#8193a9; font-size:9px; }
     .credit { margin-top:7px; color:#68798e; font-size:8px; line-height:1.35; }
     .hint { position:absolute; z-index:2; left:50%; bottom:max(12px,env(safe-area-inset-bottom)); transform:translateX(-50%); padding:7px 11px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(4,8,14,.68); color:#b8c2d0; font-size:10px; white-space:nowrap; }
+
     #rightPanelToggle { display:none !important; }
-    .mobile-panel-launchers { display:none; }
+    .panel-launchers {
+      position:absolute; z-index:6; left:50%; top:max(14px,env(safe-area-inset-top)); transform:translateX(-50%);
+      display:flex; gap:8px; padding:6px; border:1px solid rgba(255,255,255,.12); border-radius:14px;
+      background:rgba(7,12,20,.88); backdrop-filter:blur(16px); box-shadow:0 10px 34px rgba(0,0,0,.35);
+    }
+    .panel-launchers button { white-space:nowrap; padding:9px 12px; font-size:11px; }
+    body.panel-active .panel-launchers { display:none; }
 
     @media (max-width:980px) {
       .hint { display:none; }
-      .mobile-panel-launchers {
-        position:absolute; z-index:6; left:50%; bottom:max(14px,env(safe-area-inset-bottom)); transform:translateX(-50%);
-        display:flex; gap:8px; padding:6px; border:1px solid rgba(255,255,255,.12); border-radius:14px;
-        background:rgba(7,12,20,.88); backdrop-filter:blur(16px); box-shadow:0 10px 34px rgba(0,0,0,.35);
-      }
-      .mobile-panel-launchers button { white-space:nowrap; padding:9px 12px; font-size:11px; }
-      body.mobile-panel-active .mobile-panel-launchers { display:none; }
-      .mobile-panel-close { display:grid; }
-
-      #selectionPanel,#displayPanel {
-        z-index:7; top:max(10px,env(safe-area-inset-top)); bottom:max(10px,env(safe-area-inset-bottom));
-        height:auto !important; max-height:none; width:calc(100vw - 20px); margin:0;
-        opacity:0; visibility:hidden; pointer-events:none;
-        transition:transform .2s ease,opacity .16s ease,visibility .16s ease;
-      }
-      #selectionPanel {
-        left:10px; right:auto; transform:translateX(calc(-100% - 24px));
-      }
-      #displayPanel {
-        right:10px; left:auto; transform:translateX(calc(100% + 24px)); overflow-y:auto;
-      }
-      #selectionPanel.mobile-open,#displayPanel.mobile-open {
-        transform:translateX(0) !important; opacity:1; visibility:visible; pointer-events:auto;
-      }
-      #selectionPanel.right-open { opacity:0; pointer-events:none; }
-      #selectionPanel.mobile-open.right-open { opacity:1; pointer-events:auto; }
-      #displayPanel.is-open:not(.mobile-open) { transform:translateX(calc(100% + 24px)); opacity:0; visibility:hidden; pointer-events:none; }
-      #selectionPanel .catalog-list { -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+      .panel { top:max(10px,env(safe-area-inset-top)); bottom:max(10px,env(safe-area-inset-bottom)); width:calc(100vw - 20px); }
+      .panel-left { left:10px; right:auto; transform:translateX(calc(-100% - 24px)); }
+      .panel-right { right:10px; left:auto; transform:translateX(calc(100% + 24px)); }
+      .panel-launchers { top:auto; bottom:max(14px,env(safe-area-inset-bottom)); }
     }
     @media (max-width:520px) {
       .panel { border-radius:14px; }
       .filter-row,.continent-actions { grid-template-columns:1fr; }
-      .mobile-panel-launchers { width:max-content; max-width:calc(100vw - 20px); }
+      .panel-launchers { width:max-content; max-width:calc(100vw - 20px); }
     }
   </style>
 </head>
@@ -155,7 +165,7 @@
   <div id="app">
     <div id="globe"></div>
 
-    <aside id="selectionPanel" class="panel panel-left">
+    <aside id="selectionPanel" class="panel panel-left" aria-hidden="true">
       <div class="panel-pad">
         <div class="selection-header">
           <div>
@@ -163,7 +173,7 @@
             <h1>Eclipse Globe</h1>
             <p class="subtitle">Choisis les éclipses à afficher. Recherche, tri, siècle et continent restent ici.</p>
           </div>
-          <button id="selectionPanelClose" class="icon-btn mobile-panel-close" type="button" aria-label="Fermer le catalogue">×</button>
+          <button id="selectionPanelClose" class="icon-btn" type="button" aria-label="Fermer le catalogue">×</button>
         </div>
       </div>
       <details id="catalogPanel" class="catalog" open>
@@ -190,7 +200,7 @@
 
     <button id="rightPanelToggle" type="button" aria-controls="displayPanel" aria-expanded="false">Infos & affichage</button>
 
-    <aside id="displayPanel" class="panel panel-right">
+    <aside id="displayPanel" class="panel panel-right" aria-hidden="true">
       <div class="panel-pad">
         <div class="right-header"><div><p class="panel-kicker">Vue</p><h2>Infos & affichage</h2></div><button id="rightPanelClose" class="icon-btn" type="button" aria-label="Fermer">×</button></div>
 
@@ -219,62 +229,65 @@
       </div>
     </aside>
 
-    <div id="mobilePanelLaunchers" class="mobile-panel-launchers" aria-label="Ouvrir un panneau">
-      <button id="mobileOpenSelection" type="button">Éclipses</button>
-      <button id="mobileOpenInfo" type="button">Infos & affichage</button>
+    <div id="panelLaunchers" class="panel-launchers" aria-label="Ouvrir un panneau">
+      <button id="openSelectionPanel" type="button">Éclipses</button>
+      <button id="openInfoPanel" type="button">Infos & affichage</button>
     </div>
 
     <div class="hint">Glisser pour tourner · pincer / molette pour zoomer · survoler une bande pour les détails</div>
   </div>
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
-  <script src="./enhancements.js?v=14"></script>
-  <script src="./selection-list.js?v=17"></script>
+  <script src="./enhancements.js?v=18"></script>
+  <script src="./selection-list.js?v=18"></script>
   <script>
     (() => {
-      const media = window.matchMedia('(max-width: 980px)');
       const selection = document.getElementById('selectionPanel');
       const info = document.getElementById('displayPanel');
-      const openSelection = document.getElementById('mobileOpenSelection');
-      const openInfo = document.getElementById('mobileOpenInfo');
+      const openSelection = document.getElementById('openSelectionPanel');
+      const openInfo = document.getElementById('openInfoPanel');
       const closeSelection = document.getElementById('selectionPanelClose');
       const closeInfo = document.getElementById('rightPanelClose');
       const legacyInfoToggle = document.getElementById('rightPanelToggle');
       let active = null;
       let internalClassChange = false;
 
-      function syncAria() {
-        if (!media.matches) {
-          selection.removeAttribute('aria-hidden');
-          info.removeAttribute('aria-hidden');
-          return;
-        }
+      /* selection-list.js injecte une ancienne correction flex. Cette règle, injectée après,
+         force la grille bornée et garantit le scroll de la liste sur desktop et mobile. */
+      const scrollOverride = document.createElement('style');
+      scrollOverride.id = 'catalogGridScrollOverride';
+      scrollOverride.textContent = `
+        #selectionPanel { display:grid !important; grid-template-rows:auto minmax(0,1fr) !important; overflow:hidden !important; min-height:0 !important; }
+        #selectionPanel details.catalog[open] { display:grid !important; grid-template-rows:auto minmax(0,1fr) !important; min-height:0 !important; overflow:hidden !important; }
+        #selectionPanel .catalog-body { display:grid !important; grid-template-rows:auto minmax(0,1fr) auto auto !important; min-height:0 !important; overflow:hidden !important; }
+        #selectionPanel .catalog-list { min-height:0 !important; height:100% !important; overflow-y:auto !important; overflow-x:hidden !important; }
+      `;
+      document.head.appendChild(scrollOverride);
+
+      function syncState() {
         selection.setAttribute('aria-hidden', active === 'selection' ? 'false' : 'true');
         info.setAttribute('aria-hidden', active === 'info' ? 'false' : 'true');
+        document.body.classList.toggle('panel-active', active !== null);
+        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', active === 'info' ? 'true' : 'false');
       }
 
       function closeAll() {
         internalClassChange = true;
-        selection.classList.remove('mobile-open', 'right-open');
-        info.classList.remove('mobile-open', 'is-open');
-        document.body.classList.remove('mobile-panel-active');
+        selection.classList.remove('panel-open', 'mobile-open', 'right-open');
+        info.classList.remove('panel-open', 'mobile-open', 'is-open');
         active = null;
-        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', 'false');
-        syncAria();
+        syncState();
         requestAnimationFrame(() => { internalClassChange = false; });
       }
 
       function openPanel(which) {
-        if (!media.matches) return;
         internalClassChange = true;
-        selection.classList.remove('mobile-open', 'right-open');
-        info.classList.remove('mobile-open', 'is-open');
+        selection.classList.remove('panel-open', 'mobile-open', 'right-open');
+        info.classList.remove('panel-open', 'mobile-open', 'is-open');
         const target = which === 'selection' ? selection : info;
-        target.classList.add('mobile-open');
+        target.classList.add('panel-open');
         active = which;
-        document.body.classList.add('mobile-panel-active');
-        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', which === 'info' ? 'true' : 'false');
-        syncAria();
+        syncState();
         requestAnimationFrame(() => {
           internalClassChange = false;
           (which === 'selection' ? closeSelection : closeInfo)?.focus({ preventScroll:true });
@@ -286,8 +299,10 @@
       closeSelection.addEventListener('click', closeAll);
       closeInfo.addEventListener('click', closeAll);
 
+      /* enhancements.js peut demander l'ouverture du panneau infos après un tap.
+         On l'autorise seulement si aucun autre panneau n'est déjà ouvert. */
       const infoObserver = new MutationObserver(() => {
-        if (!media.matches || internalClassChange) return;
+        if (internalClassChange) return;
         if (info.classList.contains('is-open')) {
           if (active === null || active === 'info') openPanel('info');
           else info.classList.remove('is-open');
@@ -295,23 +310,9 @@
       });
       infoObserver.observe(info, { attributes:true, attributeFilter:['class'] });
 
-      function handleViewport() {
-        if (media.matches) closeAll();
-        else {
-          internalClassChange = true;
-          selection.classList.remove('mobile-open', 'right-open');
-          info.classList.remove('mobile-open', 'is-open');
-          document.body.classList.remove('mobile-panel-active');
-          active = null;
-          syncAria();
-          requestAnimationFrame(() => { internalClassChange = false; });
-        }
-      }
-
-      media.addEventListener?.('change', handleViewport);
-      handleViewport();
+      closeAll();
     })();
   </script>
-  <script type="module" src="./app.js?v=14"></script>
+  <script type="module" src="./app.js?v=18"></script>
 </body>
 </html>
