@@ -23,17 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Inspect NASA path script calls
-        run: |
-          python - <<'PY'
-          import urllib.request, re
-          url='https://eclipse.gsfc.nasa.gov/SEsearch/eclipse-path-data.js.php?Ecl=20260812&Spc=0.5'
-          body=urllib.request.urlopen(url, timeout=30).read().decode('utf-8','replace')
-          print('MAP_METHODS', sorted(set(re.findall(r'map\.([A-Za-z_$][\w$]*)\s*\(', body))))
-          for line in body.splitlines():
-              if 'map.' in line or 'northernLimitCoords' in line or 'centralLimitCoords' in line or 'southernLimitCoords' in line:
-                  print(line[:1600])
-          PY
+      - name: Build NASA total-eclipse catalog
+        run: python scripts/build-nasa-catalog.py
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
