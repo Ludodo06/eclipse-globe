@@ -19,7 +19,7 @@ PADDING = 7.0
 
 REGIONS = {
     "world": {"continents": None, "bbox": None},
-    "europe": {"continents": {"Europe"}, "bbox": (-25.0, 45.0, 34.0, 72.0)},
+    "europe": {"continents": {"Europe"}, "bbox": (-25.0, 45.0, 34.0, 72.0), "exclude_admin": {"Russia"}},
     "africa": {"continents": {"Africa"}, "bbox": (-20.0, 55.0, -38.0, 38.0)},
     "asia": {"continents": {"Asia"}, "bbox": (25.0, 180.0, -10.0, 82.0), "include_russia": True},
     "north-america": {"continents": {"North America"}, "bbox": (-170.0, -20.0, 5.0, 84.0)},
@@ -120,14 +120,17 @@ def project(region_name, lon, lat):
 
 def selected_feature(region_name, feature):
     config = REGIONS[region_name]
+    props = feature.get("properties") or {}
+    admin = props.get("ADMIN")
+    if admin in config.get("exclude_admin", set()):
+        return False
     wanted = config.get("continents")
     if wanted is None:
         return True
-    props = feature.get("properties") or {}
     continent = props.get("CONTINENT")
     if continent in wanted:
         return True
-    return bool(config.get("include_russia") and props.get("ADMIN") == "Russia")
+    return bool(config.get("include_russia") and admin == "Russia")
 
 
 def region_geometry(region_name, features):
@@ -178,7 +181,7 @@ def svg_for(region_name, shapes, source_url):
             parts.append("M" + " ".join(f"{x:.2f},{y:.2f}" for x, y in coords) + "Z")
         if parts:
             path_elements.append(
-                f'  <path d="{" ".join(parts)}" fill="#f4f7fb" fill-rule="evenodd"/>'
+                f'  <path d="{" ".join(parts)}" fill="#f4f7fb" stroke="#f4f7fb" stroke-width="0.9" stroke-linejoin="round" fill-rule="evenodd"/>'
             )
 
     return "\n".join([
