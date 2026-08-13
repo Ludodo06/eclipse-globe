@@ -56,36 +56,40 @@ def parse_catalog(text):
     totals=[]
     for line in text.splitlines():
         parts=line.split()
-        # The ASCII file can contain a leading canon/catalog sequence field layout.
-        # Find the year/month/date/time tuple rather than relying on a fixed character offset.
+        # ASCII layout:
+        # Cat, CanonPlate, Year, Mon, Day, Time, DeltaT, Lunation, Saros,
+        # Type, Gamma, Magnitude, Lat, Long, SunAlt, SunAzm, Width, Duration.
+        if len(parts) < 17:
+            continue
         year_idx=None
         for i in range(min(4, len(parts)-4)):
             if re.fullmatch(r"[+-]?\d{4}", parts[i]) and parts[i+1] in MONTHS and re.fullmatch(r"\d{1,2}", parts[i+2]) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", parts[i+3]):
                 year_idx=i; break
-        if year_idx is None: continue
-
-        # In every 5MCSE data row, eclipse type occurs four fields after the time:
-        # DeltaT, lunation, Saros, Type.
+        if year_idx is None:
+            continue
         type_idx=year_idx+7
-        if len(parts) <= type_idx or parts[type_idx] != "T": continue
+        if len(parts) <= type_idx or parts[type_idx] != "T":
+            continue
 
         try:
             year=int(parts[year_idx]); month=MONTHS[parts[year_idx+1]]; day=int(parts[year_idx+2]); time_tdt=parts[year_idx+3]
             delta_t=maybe_float(parts[year_idx+4]); lunation=int(parts[year_idx+5]); saros=int(parts[year_idx+6])
-            qle=parts[type_idx+1]; gamma=maybe_float(parts[type_idx+2]); magnitude=maybe_float(parts[type_idx+3])
-            lat=parse_coord(parts[type_idx+4]); lng=parse_coord(parts[type_idx+5]); sun_alt=maybe_float(parts[type_idx+6])
+            gamma=maybe_float(parts[type_idx+1]); magnitude=maybe_float(parts[type_idx+2])
+            lat=parse_coord(parts[type_idx+3]); lng=parse_coord(parts[type_idx+4])
+            sun_alt=maybe_float(parts[type_idx+5]); sun_azm=maybe_float(parts[type_idx+6])
             width=maybe_float(parts[type_idx+7]) if len(parts)>type_idx+7 else None
             duration=parts[type_idx+8] if len(parts)>type_idx+8 and re.fullmatch(r"\d{2}m\d{2}s",parts[type_idx+8]) else None
-            catalog_number=int(parts[year_idx-1]) if year_idx>0 and parts[year_idx-1].isdigit() else None
+            catalog_number=int(parts[year_idx-2]) if year_idx>=2 and parts[year_idx-2].isdigit() else None
+            canon_plate=int(parts[year_idx-1]) if year_idx>=1 and parts[year_idx-1].isdigit() else None
         except (ValueError, IndexError):
             continue
 
         nid=nasa_id(year,month,day)
         totals.append({
-            "id":f"{nid}-total","nasaId":nid,"catalogNumber":catalog_number,
+            "id":f"{nid}-total","nasaId":nid,"catalogNumber":catalog_number,"canonPlate":canon_plate,
             "year":year,"month":month,"day":day,"monthCode":parts[year_idx+1],"timeTdt":time_tdt,
-            "deltaTSeconds":delta_t,"lunation":lunation,"saros":saros,"type":"total","qle":qle,
-            "gamma":gamma,"magnitude":magnitude,"focus":[lat,lng],"sunAltitudeDeg":sun_alt,
+            "deltaTSeconds":delta_t,"lunation":lunation,"saros":saros,"type":"total",
+            "gamma":gamma,"magnitude":magnitude,"focus":[lat,lng],"sunAltitudeDeg":sun_alt,"sunAzimuthDeg":sun_azm,
             "maxPathWidthKm":width,"maxDuration":duration,"continent":principal_continent(lat,lng)
         })
     totals.sort(key=lambda x:(x["year"],x["month"],x["day"],x["timeTdt"]))
@@ -98,9 +102,7 @@ def main():
     text=raw.decode("latin-1")
     totals=parse_catalog(text)
     if len(totals)!=EXPECTED_TOTALS:
-        print("--- NASA ASCII SAMPLE ---")
-        for line in text.splitlines()[:100]: print(repr(line))
-        print("--- 2026 SEARCH ---")
+        print("2026 source row:")
         for line in text.splitlines():
             if "2026 Aug 12" in line: print(repr(line))
         raise RuntimeError(f"NASA catalog parser found {len(totals)} total eclipses; expected {EXPECTED_TOTALS}. Refusing to publish an incomplete catalog.")
