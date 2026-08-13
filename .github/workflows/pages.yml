@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Build NASA total-eclipse catalog
         run: python scripts/build-nasa-catalog.py
+      - name: Check JavaScript syntax
+        run: node --check app.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
