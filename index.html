@@ -37,9 +37,9 @@
     .stat strong { display:block; font-size:15px; }
     .stat span { display:block; margin-top:2px; color:#9ca9bb; font-size:11px; }
     .legend { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:12px; color:#aeb8c8; font-size:11px; }
-    .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
-    .dot.black { background:#050505; border:1px solid #666; }
-    .line-white { width:13px; height:0; display:inline-block; margin:0 5px 3px 0; border-top:1px solid rgba(255,255,255,.9); }
+    .legend-chip { display:inline-flex; align-items:center; gap:5px; }
+    .gradient-chip { width:18px; height:7px; border-radius:999px; background:linear-gradient(90deg,#9b6cff,#ff8a3d); display:inline-block; }
+    .line-white { width:13px; height:0; display:inline-block; border-top:1px solid rgba(255,255,255,.9); }
     .status { margin-top:10px; padding:7px 9px; border-radius:8px; background:rgba(255,255,255,.045); color:#8fa0b5; font-size:10px; letter-spacing:.01em; }
     .credit { margin-top:10px; color:#78869a; font-size:10px; line-height:1.35; }
     .hint { position:absolute; z-index:2; bottom:max(14px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:#b8c2d0; font-size:12px; background:rgba(4,8,14,.68); border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:8px 12px; backdrop-filter:blur(10px); white-space:nowrap; }
@@ -57,12 +57,12 @@
       <div id="eclipseList" class="eclipse-list">
         <label class="eclipse-option">
           <input type="checkbox" value="2026-08-12-total" />
-          <span class="eclipse-swatch" style="background:#ffb347"></span>
+          <span class="eclipse-swatch" style="background:#9b6cff"></span>
           <span class="eclipse-option-text"><strong>12 août 2026</strong><small>Éclipse solaire totale</small></span>
         </label>
         <label class="eclipse-option">
           <input type="checkbox" value="2027-08-02-total" checked />
-          <span class="eclipse-swatch" style="background:#ff4d4d"></span>
+          <span class="eclipse-swatch" style="background:#ff8a3d"></span>
           <span class="eclipse-option-text"><strong>2 août 2027</strong><small>Éclipse solaire totale</small></span>
         </label>
       </div>
@@ -80,16 +80,16 @@
       </div>
 
       <div class="legend">
-        <span><i class="dot black"></i>bande de totalité</span>
-        <span><i class="line-white"></i>frontières</span>
+        <span class="legend-chip"><i class="gradient-chip"></i>couleur = éclipse</span>
+        <span class="legend-chip"><i class="line-white"></i>frontières</span>
       </div>
-      <div id="layerStatus" class="status">éclipses … · frontières … · build 9</div>
-      <div class="credit">Données d’éclipse : Eclipse Predictions by Fred Espenak, NASA's GSFC. Bandes WGS‑84 avec fondu sur les 10 % de début et de fin.</div>
+      <div id="layerStatus" class="status">éclipses … · frontières … · build 10</div>
+      <div class="credit">Données d’éclipse : Eclipse Predictions by Fred Espenak, NASA's GSFC. Rubans WGS‑84 avec fondu sur les 10 % de début et de fin.</div>
     </section>
     <div class="hint">Glisser pour tourner · pincer / molette pour zoomer</div>
   </div>
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
-  <script type="module" src="./app.js?v=9"></script>
+  <script type="module" src="./app.js?v=10"></script>
 </body>
 </html>
