@@ -35,7 +35,7 @@ jobs:
 
           build = os.environ['BUILD_NUMBER']
 
-          for filename in ('app.js', 'enhancements.js', 'selection-list.js'):
+          for filename in ('app.js', 'enhancements.js', 'selection-list.js', 'selector-ui.js'):
               path = Path(filename)
               text = path.read_text(encoding='utf-8')
               text, count = re.subn(r'const BUILD = \d+;', f'const BUILD = {build};', text, count=1)
@@ -48,23 +48,25 @@ jobs:
           for script in ('enhancements.js', 'selection-list.js', 'app.js'):
               text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
 
-          # panel-scroll.js est volontairement injecté au déploiement : il capture
-          # la molette au-dessus du catalogue avant qu'OrbitControls ne la voie.
-          panel_script = f'  <script src="./panel-scroll.js?v={build}"></script>\n'
+          # Le nouveau sélecteur doit préparer le DOM avant selection-list.js et app.js.
+          selector_script = f'  <script src="./selector-ui.js?v={build}"></script>\n'
           marker = '  <script src="./selection-list.js?v='
-          if './panel-scroll.js?v=' not in text:
+          if './selector-ui.js?v=' not in text:
               position = text.find(marker)
               if position < 0:
                   raise SystemExit('selection-list script marker not found in index.html')
-              text = text[:position] + panel_script + text[position:]
+              text = text[:position] + selector_script + text[position:]
           else:
-              text = re.sub(r'(\./panel-scroll\.js\?v=)\d+', rf'\g<1>{build}', text)
+              text = re.sub(r'(\./selector-ui\.js\?v=)\d+', rf'\g<1>{build}', text)
+
+          # L'ancien correctif de molette n'est plus chargé : scroll natif du panneau entier.
+          text = re.sub(r'^\s*<script src="\./panel-scroll\.js\?v=\d+"></script>\s*\n?', '', text, flags=re.M)
 
           index.write_text(text, encoding='utf-8')
           print(f'Deploying build {build}')
           PY
       - name: Check JavaScript syntax
-        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check panel-scroll.js
+        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
