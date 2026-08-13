@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Build NASA total-eclipse catalog
         run: python scripts/build-nasa-catalog.py
+      - name: Build Natural Earth continent icons
+        run: python scripts/build-continent-icons.py
       - name: Prepare deployment
         env:
           BUILD_NUMBER: ${{ github.run_number }}
@@ -158,8 +160,8 @@ jobs:
           index.write_text(text, encoding='utf-8')
           print(f'Deploying build {build}')
           PY
-      - name: Check JavaScript syntax
-        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js && node --check panel-controls.js && node --check period-slider.js && node --check display-selection.js && node --check stable-identity.js && node --check century-labels.js
+      - name: Check JavaScript and icon generator syntax
+        run: python -m py_compile scripts/build-continent-icons.py && node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js && node --check panel-controls.js && node --check period-slider.js && node --check display-selection.js && node --check stable-identity.js && node --check century-labels.js && node --check continent-icons.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
