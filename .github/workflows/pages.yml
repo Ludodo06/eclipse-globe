@@ -43,6 +43,23 @@ jobs:
                   raise SystemExit(f'BUILD constant not found exactly once in {filename}')
               path.write_text(text, encoding='utf-8')
 
+          # Hover identity has one owner: enhancements.js.
+          # Use a high-precision RGB fingerprint instead of 8-bit rounding,
+          # and prevent selection-list.js from overwriting an existing key.
+          enhancements = Path('enhancements.js')
+          enhancements_text = enhancements.read_text(encoding='utf-8')
+          enhancements_text = enhancements_text.replace(' * 255)', ' * 1000000)')
+          enhancements.write_text(enhancements_text, encoding='utf-8')
+
+          selection_list = Path('selection-list.js')
+          selection_text = selection_list.read_text(encoding='utf-8')
+          repair_marker = "  function repairRibbonMesh(mesh) {\n    if (!state.colorsReady || !state.THREE) return;"
+          repair_replacement = "  function repairRibbonMesh(mesh) {\n    if (mesh?.geometry?.getAttribute?.('aEclipseKey')) return;\n    if (!state.colorsReady || !state.THREE) return;"
+          if repair_marker not in selection_text:
+              raise SystemExit('selection-list repairRibbonMesh marker not found')
+          selection_text = selection_text.replace(repair_marker, repair_replacement, 1)
+          selection_list.write_text(selection_text, encoding='utf-8')
+
           app = Path('app.js')
           app_text = app.read_text(encoding='utf-8')
           app_hook = "\n".join([
