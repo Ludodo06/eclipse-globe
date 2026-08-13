@@ -56,24 +56,23 @@ def parse_catalog(text):
     totals=[]
     for line in text.splitlines():
         parts=line.split()
-        # ASCII layout:
-        # Cat, CanonPlate, Year, Mon, Day, Time, DeltaT, Lunation, Saros,
-        # Type, Gamma, Magnitude, Lat, Long, SunAlt, SunAzm, Width, Duration.
-        if len(parts) < 17:
-            continue
         year_idx=None
-        for i in range(min(4, len(parts)-4)):
-            if re.fullmatch(r"[+-]?\d{4}", parts[i]) and parts[i+1] in MONTHS and re.fullmatch(r"\d{1,2}", parts[i+2]) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", parts[i+3]):
+        for i in range(min(4, max(0, len(parts)-4))):
+            if (re.fullmatch(r"[+-]?\d{4}", parts[i]) and parts[i+1] in MONTHS
+                    and re.fullmatch(r"\d{1,2}", parts[i+2]) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", parts[i+3])):
                 year_idx=i; break
-        if year_idx is None:
-            continue
+        if year_idx is None: continue
         type_idx=year_idx+7
-        if len(parts) <= type_idx or parts[type_idx] != "T":
+        if len(parts) <= type_idx or not parts[type_idx].startswith("T"):
+            continue
+        # We need through Sun azimuth. One-limit/non-central totals may omit width/duration.
+        if len(parts) <= type_idx+6:
             continue
 
         try:
             year=int(parts[year_idx]); month=MONTHS[parts[year_idx+1]]; day=int(parts[year_idx+2]); time_tdt=parts[year_idx+3]
             delta_t=maybe_float(parts[year_idx+4]); lunation=int(parts[year_idx+5]); saros=int(parts[year_idx+6])
+            subtype=parts[type_idx]
             gamma=maybe_float(parts[type_idx+1]); magnitude=maybe_float(parts[type_idx+2])
             lat=parse_coord(parts[type_idx+3]); lng=parse_coord(parts[type_idx+4])
             sun_alt=maybe_float(parts[type_idx+5]); sun_azm=maybe_float(parts[type_idx+6])
@@ -88,7 +87,7 @@ def parse_catalog(text):
         totals.append({
             "id":f"{nid}-total","nasaId":nid,"catalogNumber":catalog_number,"canonPlate":canon_plate,
             "year":year,"month":month,"day":day,"monthCode":parts[year_idx+1],"timeTdt":time_tdt,
-            "deltaTSeconds":delta_t,"lunation":lunation,"saros":saros,"type":"total",
+            "deltaTSeconds":delta_t,"lunation":lunation,"saros":saros,"type":"total","typeCode":subtype,
             "gamma":gamma,"magnitude":magnitude,"focus":[lat,lng],"sunAltitudeDeg":sun_alt,"sunAzimuthDeg":sun_azm,
             "maxPathWidthKm":width,"maxDuration":duration,"continent":principal_continent(lat,lng)
         })
@@ -99,17 +98,14 @@ def parse_catalog(text):
 def main():
     req=urllib.request.Request(CATALOG_URL,headers={"User-Agent":"EclipseGlobeCatalogBuilder/1.0"})
     with urllib.request.urlopen(req,timeout=60) as r: raw=r.read()
-    text=raw.decode("latin-1")
-    totals=parse_catalog(text)
+    totals=parse_catalog(raw.decode("latin-1"))
     if len(totals)!=EXPECTED_TOTALS:
-        print("2026 source row:")
-        for line in text.splitlines():
-            if "2026 Aug 12" in line: print(repr(line))
         raise RuntimeError(f"NASA catalog parser found {len(totals)} total eclipses; expected {EXPECTED_TOTALS}. Refusing to publish an incomplete catalog.")
     payload={"source":{"publisher":"NASA GSFC / Fred Espenak & Jean Meeus","title":"Five Millennium Catalog of Solar Eclipses: -1999 to +3000","url":CATALOG_URL,"totalCount":EXPECTED_TOTALS,"continentGrouping":"nearest principal continent to the point of greatest eclipse"},"eclipses":totals}
     OUT_PATH.parent.mkdir(parents=True,exist_ok=True)
     OUT_PATH.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
     print(f"Generated {OUT_PATH} with {len(totals)} total solar eclipses")
-    print("First:",totals[0]); print("2026:",next(x for x in totals if x["nasaId"]=="20260812")); print("2027:",next(x for x in totals if x["nasaId"]=="20270802")); print("Last:",totals[-1])
+    print("2026:",next(x for x in totals if x["nasaId"]=="20260812"))
+    print("2027:",next(x for x in totals if x["nasaId"]=="20270802"))
 
 if __name__=="__main__": main()
