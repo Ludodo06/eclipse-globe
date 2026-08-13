@@ -2,7 +2,13 @@
 
 Globe 3D interactif affichant la bande de totalité de l'éclipse solaire totale du 2 août 2027.
 
-## Lancer
+## Démo en ligne
+
+🌍 **[Ouvrir Eclipse Globe](https://ludodo06.github.io/eclipse-globe/)**
+
+La démo est hébergée gratuitement avec GitHub Pages et fonctionne sur ordinateur et mobile.
+
+## Lancer localement
 
 Depuis ce dossier :
 
