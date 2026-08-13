@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Eclipse Globe</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #02050a; }
+    #globe { position: absolute; inset: 0; }
+    .panel {
+      position: absolute; z-index: 3; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left));
+      width: min(360px, calc(100vw - 32px)); padding: 16px; border-radius: 16px;
+      background: rgba(7, 12, 20, .86); border: 1px solid rgba(255,255,255,.13); backdrop-filter: blur(16px);
+      box-shadow: 0 16px 60px rgba(0,0,0,.36);
+    }
+    h1 { margin: 0 0 6px; font-size: 20px; }
+    .subtitle { margin: 0 0 14px; color: #aeb8c8; font-size: 13px; line-height: 1.45; }
+    label { display:block; margin-bottom: 6px; color:#ccd5e3; font-size:12px; font-weight:600; }
+    select, button { width: 100%; border: 1px solid rgba(255,255,255,.14); background:#111b2a; color:#f4f7fb; padding:10px 12px; border-radius:10px; font:inherit; }
+    button { cursor:pointer; margin-top:10px; font-weight:650; }
+    button:hover { background:#17253a; }
+    .stats { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; }
+    .stat { padding:10px; border-radius:10px; background:rgba(255,255,255,.055); }
+    .stat strong { display:block; font-size:15px; }
+    .stat span { display:block; margin-top:2px; color:#9ca9bb; font-size:11px; }
+    .legend { display:flex; gap:14px; align-items:center; margin-top:12px; color:#aeb8c8; font-size:11px; }
+    .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
+    .dot.black { background:#050505; border:1px solid #666; }
+    .dot.red { background:#e04a4a; }
+    .credit { margin-top:10px; color:#78869a; font-size:10px; line-height:1.35; }
+    .hint { position:absolute; z-index:2; bottom:max(14px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:#b8c2d0; font-size:12px; background:rgba(4,8,14,.68); border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:8px 12px; backdrop-filter:blur(10px); white-space:nowrap; }
+    @media (max-width: 600px) { .panel { padding:13px; } .hint { font-size:11px; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="globe"></div>
+    <section class="panel">
+      <h1>Eclipse Globe</h1>
+      <p class="subtitle">Visualisation 3D de la bande de totalité sur la Terre.</p>
+      <label for="eclipseSelect">Éclipse</label>
+      <select id="eclipseSelect"></select>
+      <button id="focusBtn">Centrer sur la bande</button>
+      <div class="stats">
+        <div class="stat"><strong id="maxWidth">—</strong><span>largeur max.</span></div>
+        <div class="stat"><strong id="maxDuration">—</strong><span>totalité max.</span></div>
+      </div>
+      <div class="legend"><span><i class="dot black"></i>bande de totalité</span><span><i class="dot red"></i>ligne centrale</span></div>
+      <div class="credit">Données : Eclipse Predictions by Fred Espenak, NASA's GSFC. Limites WGS‑84 échantillonnées le long de la trajectoire.</div>
+    </section>
+    <div class="hint">Glisser pour tourner · pincer / molette pour zoomer</div>
+  </div>
+
+  <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
