@@ -55,6 +55,7 @@
   import(`./century-labels.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Libellés de siècles indisponibles :', error));
   import(`./display-selection.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Action afficher sélection indisponible :', error));
   import(`./continent-icons.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Icônes de continents indisponibles :', error));
+  import(`./hover-tooltip.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Tooltip des éclipses indisponible :', error));
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
