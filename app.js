@@ -1,27 +1,38 @@
 const EARTH_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
 const BUMP_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
+const COUNTRIES_GEOJSON = 'https://cdn.jsdelivr.net/gh/vasturiano/three-globe@master/example/datasets/ne_110m_admin_0_countries.geojson';
 
 const dms = (deg, min, hemi) => {
   const value = Number(deg) + Number(min) / 60;
   return (hemi === 'S' || hemi === 'W') ? -value : value;
 };
 
-const toLatLng = (entry) => [dms(entry.lat[0], entry.lat[1], entry.lat[2]), dms(entry.lon[0], entry.lon[1], entry.lon[2])];
+const toLatLng = (entry) => [
+  dms(entry.lat[0], entry.lat[1], entry.lat[2]),
+  dms(entry.lon[0], entry.lon[1], entry.lon[2])
+];
 
-function buildLayers(eclipse) {
+function buildEclipseGeometry(eclipse) {
   const rows = eclipse.path.filter(r => r.north && r.south && r.center);
   const north = rows.map(r => toLatLng(r.north));
   const south = rows.map(r => toLatLng(r.south));
   const center = rows.map(r => toLatLng(r.center));
 
-  const bandCoords = [
-    ...north.map(([lat, lng]) => ({ lat, lng })),
-    ...south.slice().reverse().map(([lat, lng]) => ({ lat, lng }))
+  const ring = [
+    ...north.map(([lat, lng]) => [lng, lat]),
+    ...south.slice().reverse().map(([lat, lng]) => [lng, lat])
   ];
+  ring.push(ring[0]);
 
   return {
-    polygons: [{ id: 'totality', coordinates: bandCoords }],
-    paths: [{ id: 'centerline', points: center.map(([lat, lng]) => ({ lat, lng })) }]
+    polygon: {
+      kind: 'eclipse',
+      geometry: { type: 'Polygon', coordinates: [ring] }
+    },
+    path: {
+      id: 'centerline',
+      points: center.map(([lat, lng]) => ({ lat, lng }))
+    }
   };
 }
 
@@ -32,10 +43,14 @@ const globe = Globe()(document.getElementById('globe'))
   .showAtmosphere(true)
   .atmosphereColor('#6ea9ff')
   .atmosphereAltitude(0.16)
-  .polygonCapColor(() => 'rgba(0,0,0,0.88)')
-  .polygonSideColor(() => 'rgba(0,0,0,0.42)')
-  .polygonStrokeColor(() => 'rgba(255,255,255,0.30)')
-  .polygonAltitude(0.006)
+  .polygonGeoJsonGeometry(d => d.geometry)
+  .polygonCapColor(d => d.kind === 'eclipse' ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0)')
+  .polygonSideColor(d => d.kind === 'eclipse' ? 'rgba(0,0,0,0.42)' : 'rgba(0,0,0,0)')
+  .polygonStrokeColor(d => {
+    if (d.kind === 'eclipse') return 'rgba(255,255,255,0.32)';
+    return bordersVisible ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0)';
+  })
+  .polygonAltitude(d => d.kind === 'eclipse' ? 0.006 : 0.002)
   .pathPointLat('lat')
   .pathPointLng('lng')
   .pathColor(() => '#e04a4a')
@@ -51,20 +66,31 @@ const select = document.getElementById('eclipseSelect');
 const maxWidth = document.getElementById('maxWidth');
 const maxDuration = document.getElementById('maxDuration');
 const focusBtn = document.getElementById('focusBtn');
+const bordersToggle = document.getElementById('bordersToggle');
+const subtitle = document.querySelector('.subtitle');
 
 let eclipses = [];
 let active = null;
+let countryPolygons = [];
+let bordersVisible = true;
+let activeEclipsePolygon = null;
+
+function refreshPolygons() {
+  const polygons = [...countryPolygons];
+  if (activeEclipsePolygon) polygons.push(activeEclipsePolygon);
+  globe.polygonsData(polygons);
+}
 
 function renderEclipse(eclipse) {
-  active = eclipse;
-  const layers = buildLayers(eclipse);
-  globe.polygonsData(layers.polygons).polygonGeoJsonGeometry(d => ({
-    type: 'Polygon',
-    coordinates: [[...d.coordinates.map(p => [p.lng, p.lat]), [d.coordinates[0].lng, d.coordinates[0].lat]]]
-  }));
-  globe.pathsData(layers.paths).pathPoints('points');
+  if (!eclipse) return;
 
-  maxWidth.textContent = `${eclipse.stats.maxPathWidthKm} km`;
+  active = eclipse;
+  const geometry = buildEclipseGeometry(eclipse);
+  activeEclipsePolygon = geometry.polygon;
+  refreshPolygons();
+  globe.pathsData([geometry.path]).pathPoints('points');
+
+  maxWidth.textContent = `${String(eclipse.stats.maxPathWidthKm).replace('.', ',')} km`;
   maxDuration.textContent = eclipse.stats.maxDuration;
   focusOnEclipse();
 }
@@ -75,26 +101,69 @@ function focusOnEclipse() {
   globe.pointOfView({ lat, lng, altitude: 1.75 }, 900);
 }
 
-fetch('./data/eclipses.json')
-  .then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  })
-  .then(data => {
-    eclipses = data.eclipses;
-    select.innerHTML = eclipses.map(e => `<option value="${e.id}">${e.date} — ${e.name}</option>`).join('');
-    renderEclipse(eclipses[0]);
-  })
-  .catch(err => {
-    console.error(err);
-    document.querySelector('.subtitle').textContent = 'Impossible de charger les données locales de l’éclipse.';
-  });
+async function loadCountries() {
+  try {
+    const response = await fetch(COUNTRIES_GEOJSON);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const geojson = await response.json();
+    countryPolygons = geojson.features.map(feature => ({
+      kind: 'country',
+      geometry: feature.geometry,
+      properties: feature.properties
+    }));
+    refreshPolygons();
+  } catch (err) {
+    console.warn('Impossible de charger les frontières :', err);
+    bordersToggle.checked = false;
+    bordersToggle.disabled = true;
+  }
+}
 
-select.addEventListener('change', () => renderEclipse(eclipses.find(e => e.id === select.value)));
+async function loadEclipses() {
+  try {
+    const response = await fetch('./data/eclipses.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+
+    if (!Array.isArray(data.eclipses) || data.eclipses.length === 0) {
+      throw new Error('Aucune éclipse dans le fichier de données');
+    }
+
+    eclipses = data.eclipses;
+    select.innerHTML = '';
+    for (const eclipse of eclipses) {
+      const option = document.createElement('option');
+      option.value = eclipse.id;
+      option.textContent = `${eclipse.date} — ${eclipse.name}`;
+      select.appendChild(option);
+    }
+
+    select.value = eclipses[0].id;
+    renderEclipse(eclipses[0]);
+  } catch (err) {
+    console.error('Impossible de charger les éclipses :', err);
+    subtitle.textContent = 'La Terre est chargée, mais les données de l’éclipse n’ont pas pu être récupérées. Recharge la page pour réessayer.';
+  }
+}
+
+select.addEventListener('change', () => {
+  const eclipse = eclipses.find(e => e.id === select.value);
+  if (eclipse) renderEclipse(eclipse);
+});
+
 focusBtn.addEventListener('click', focusOnEclipse);
+
+bordersToggle.addEventListener('change', () => {
+  bordersVisible = bordersToggle.checked;
+  globe.polygonStrokeColor(globe.polygonStrokeColor());
+  refreshPolygons();
+});
 
 function resize() {
   globe.width(window.innerWidth).height(window.innerHeight);
 }
+
 window.addEventListener('resize', resize);
 resize();
+
+Promise.allSettled([loadCountries(), loadEclipses()]);
