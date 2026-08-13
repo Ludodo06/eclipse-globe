@@ -52,6 +52,9 @@
   }
 
   import(`./period-slider.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Slider période indisponible :', error));
+  import(`./stable-identity.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Identité stable indisponible :', error));
+  import(`./century-labels.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Libellés de siècles indisponibles :', error));
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
 })();
