@@ -54,6 +54,7 @@
   import(`./period-slider.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Slider période indisponible :', error));
   import(`./century-labels.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Libellés de siècles indisponibles :', error));
   import(`./display-selection.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Action afficher sélection indisponible :', error));
+  import(`./continent-icons.js?v=${encodeURIComponent(version)}`).catch(error => console.warn('Icônes de continents indisponibles :', error));
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
