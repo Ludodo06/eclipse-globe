@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/+esm';
 
-const BUILD = 11;
+const BUILD = 12;
 const EARTH_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
 const BUMP_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
 const COUNTRIES_GEOJSON = 'https://cdn.jsdelivr.net/gh/vasturiano/globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson';
@@ -10,10 +10,9 @@ const LOCAL_ECLIPSE_FILES = [
   ['./data/eclipses.json?v=10', '20270802']
 ];
 const NASA_PATH_ENDPOINT = 'https://eclipse.gsfc.nasa.gov/SEsearch/eclipse-path-data.js.php';
+const NASA_PATH_CONCURRENCY = 8;
 const FADE_FRACTION = 0.10;
 const RIBBON_OPACITY = 0.74;
-const RIBBON_STEP_DEGREES = 1.4;
-const DETAILED_SELECTION_LIMIT = 12;
 const CHRONO_PAGE_SIZE = 250;
 const CONTINENT_ORDER = [
   'Europe', 'Afrique', 'Asie', 'Amérique du Nord',
@@ -93,15 +92,11 @@ function slerpLatLng(a, b, t) {
   const vb = latLngToUnit(b);
   const dot = clamp(va.dot(vb), -1, 1);
 
-  if (dot > 0.999999) {
-    return unitToLatLng(va.lerp(vb, t));
-  }
+  if (dot > 0.999999) return unitToLatLng(va.lerp(vb, t));
 
   const omega = Math.acos(dot);
   const sinOmega = Math.sin(omega);
-  if (Math.abs(sinOmega) < 1e-7) {
-    return unitToLatLng(va.lerp(vb, t));
-  }
+  if (Math.abs(sinOmega) < 1e-7) return unitToLatLng(va.lerp(vb, t));
 
   const result = va.multiplyScalar(Math.sin((1 - t) * omega) / sinOmega)
     .add(vb.multiplyScalar(Math.sin(t * omega) / sinOmega));
@@ -123,9 +118,7 @@ function pointAlongLine(points, info, progress) {
   if (info.total <= 1e-9) return points[Math.round(progress * (points.length - 1))];
   const target = clamp(progress, 0, 1) * info.total;
   let index = 0;
-  while (index < info.cumulative.length - 2 && info.cumulative[index + 1] < target) {
-    index += 1;
-  }
+  while (index < info.cumulative.length - 2 && info.cumulative[index + 1] < target) index += 1;
   const start = info.cumulative[index];
   const end = info.cumulative[index + 1];
   const local = end > start ? (target - start) / (end - start) : 0;
@@ -141,12 +134,24 @@ function alignEdges(north, south) {
   return reversed < same ? { north, south: south.slice().reverse() } : { north, south };
 }
 
-function resampleEdges(northInput, southInput) {
+function ribbonLod(selectionCount) {
+  if (selectionCount <= 24) return { step: 1.4, maxSamples: 420 };
+  if (selectionCount <= 100) return { step: 2.1, maxSamples: 300 };
+  if (selectionCount <= 400) return { step: 3.2, maxSamples: 220 };
+  if (selectionCount <= 1200) return { step: 4.8, maxSamples: 155 };
+  return { step: 7.0, maxSamples: 105 };
+}
+
+function layerAltitude(index, base = 0.006) {
+  return base + (index % 10) * 0.00007;
+}
+
+function resampleEdges(northInput, southInput, stepDegrees, maxSamples) {
   const aligned = alignEdges(northInput, southInput);
   const northInfo = lineCumulative(aligned.north);
   const southInfo = lineCumulative(aligned.south);
   const maxLength = Math.max(northInfo.total, southInfo.total);
-  const count = clamp(Math.ceil(maxLength / RIBBON_STEP_DEGREES) + 1, 18, 420);
+  const count = clamp(Math.ceil(maxLength / stepDegrees) + 1, 18, maxSamples);
   const north = [];
   const south = [];
   for (let i = 0; i < count; i += 1) {
@@ -172,77 +177,133 @@ function edgesFromLocalPath(path) {
   };
 }
 
-function makeRibbonMesh(eclipse, eclipseIndex, edges) {
-  if (!edges?.north || !edges?.south || edges.north.length < 2 || edges.south.length < 2) {
-    return null;
-  }
-
-  const colors = colorForEclipse(eclipse);
-  const { north, south } = resampleEdges(edges.north, edges.south);
-  const altitude = 0.006 + Math.min(eclipseIndex, DETAILED_SELECTION_LIMIT) * 0.00045;
+function makeCombinedRibbonItem(entries, selectionCount) {
+  if (!entries.length) return null;
+  const lod = ribbonLod(selectionCount);
   const positions = [];
   const alphas = [];
+  const colors = [];
   const indices = [];
 
-  for (let i = 0; i < north.length; i += 1) {
-    const n = globe.getCoords(north[i][0], north[i][1], altitude);
-    const s = globe.getCoords(south[i][0], south[i][1], altitude);
-    positions.push(n.x, n.y, n.z, s.x, s.y, s.z);
-    const alpha = edgeAlpha(i / Math.max(1, north.length - 1));
-    alphas.push(alpha, alpha);
-  }
+  entries.forEach(({ eclipse, index, edges }) => {
+    if (!edges?.north || !edges?.south || edges.north.length < 2 || edges.south.length < 2) return;
+    const sampled = resampleEdges(edges.north, edges.south, lod.step, lod.maxSamples);
+    const color = new THREE.Color(colorForEclipse(eclipse).band);
+    const altitude = layerAltitude(index, 0.006);
+    const vertexOffset = positions.length / 3;
 
-  for (let i = 0; i < north.length - 1; i += 1) {
-    const n0 = i * 2;
-    const s0 = n0 + 1;
-    const n1 = n0 + 2;
-    const s1 = n0 + 3;
-    indices.push(n0, n1, s0, n1, s1, s0);
-  }
+    for (let i = 0; i < sampled.north.length; i += 1) {
+      const n = globe.getCoords(sampled.north[i][0], sampled.north[i][1], altitude);
+      const s = globe.getCoords(sampled.south[i][0], sampled.south[i][1], altitude);
+      positions.push(n.x, n.y, n.z, s.x, s.y, s.z);
+      const alpha = edgeAlpha(i / Math.max(1, sampled.north.length - 1));
+      alphas.push(alpha, alpha);
+      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+    }
+
+    for (let i = 0; i < sampled.north.length - 1; i += 1) {
+      const n0 = vertexOffset + i * 2;
+      const s0 = n0 + 1;
+      const n1 = n0 + 2;
+      const s1 = n0 + 3;
+      indices.push(n0, n1, s0, n1, s1, s0);
+    }
+  });
+
+  if (!indices.length) return null;
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('aAlpha', new THREE.Float32BufferAttribute(alphas, 1));
+  geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
 
   const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uColor: { value: new THREE.Color(colors.band) },
-      uOpacity: { value: RIBBON_OPACITY }
-    },
+    uniforms: { uOpacity: { value: RIBBON_OPACITY } },
     vertexShader: `
       attribute float aAlpha;
+      attribute vec3 aColor;
       varying float vAlpha;
+      varying vec3 vColor;
       void main() {
         vAlpha = aAlpha;
+        vColor = aColor;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
-      uniform vec3 uColor;
       uniform float uOpacity;
       varying float vAlpha;
+      varying vec3 vColor;
       void main() {
         float alpha = uOpacity * vAlpha;
         if (alpha < 0.006) discard;
-        gl_FragColor = vec4(uColor, alpha);
+        gl_FragColor = vec4(vColor, alpha);
       }
     `,
     transparent: true,
     depthTest: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.NormalBlending
+    blending: THREE.NormalBlending,
+    vertexColors: true
   });
 
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 3 + eclipseIndex;
-  mesh.name = `${eclipse.id}-ribbon`;
-  return { id: eclipse.id, mesh, kind: 'ribbon' };
+  mesh.renderOrder = 3;
+  mesh.frustumCulled = false;
+  mesh.name = `combined-ribbons-${entries.length}`;
+  return { id: 'combined-ribbons', mesh, kind: 'ribbons' };
 }
 
-function makeOverviewItem(selection) {
+function makeCombinedLineItem(entries) {
+  if (!entries.length) return null;
+  const positions = [];
+  const colors = [];
+
+  const addLine = (points, colorValue, altitude) => {
+    if (!points || points.length < 2) return;
+    const color = new THREE.Color(colorValue);
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = globe.getCoords(points[i][0], points[i][1], altitude);
+      const b = globe.getCoords(points[i + 1][0], points[i + 1][1], altitude);
+      positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+    }
+  };
+
+  entries.forEach(({ eclipse, index, edges }) => {
+    const eclipseColors = colorForEclipse(eclipse);
+    addLine(edges?.center, eclipseColors.line, layerAltitude(index, 0.0107));
+    const hasRibbon = edges?.north?.length >= 2 && edges?.south?.length >= 2;
+    if (!hasRibbon) {
+      addLine(edges?.north, eclipseColors.band, layerAltitude(index, 0.0102));
+      addLine(edges?.south, eclipseColors.band, layerAltitude(index, 0.0102));
+    }
+  });
+
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeBoundingSphere();
+
+  const material = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.94,
+    depthTest: true,
+    depthWrite: false
+  });
+  const mesh = new THREE.LineSegments(geometry, material);
+  mesh.renderOrder = 5;
+  mesh.frustumCulled = false;
+  mesh.name = `combined-centerlines-${entries.length}`;
+  return { id: 'combined-centerlines', mesh, kind: 'centerlines' };
+}
+
+function makeOverviewItem(selection, id = 'overview') {
   if (!selection.length) return null;
   const geometry = new THREE.SphereGeometry(0.42, 7, 5);
   const material = new THREE.MeshBasicMaterial({
@@ -266,44 +327,8 @@ function makeOverviewItem(selection) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.renderOrder = 4;
   mesh.frustumCulled = false;
-  mesh.name = `overview-${selection.length}`;
-  return { id: 'overview', mesh, kind: 'overview' };
-}
-
-function centerLinePath(eclipse, eclipseIndex, edges) {
-  if (!edges?.center || edges.center.length < 2) return null;
-  const colors = colorForEclipse(eclipse);
-  const revision = lineAnimationRevision.get(eclipse.id) || 0;
-  return {
-    kind: 'centerline',
-    id: `${eclipse.id}-centerline-${revision}`,
-    color: colors.line,
-    stroke: 0.58,
-    points: edges.center.map(([lat, lng]) => ({
-      lat, lng, alt: 0.011 + eclipseIndex * 0.00045
-    }))
-  };
-}
-
-function boundaryFallbackPaths(eclipse, eclipseIndex, edges) {
-  const colors = colorForEclipse(eclipse);
-  const revision = lineAnimationRevision.get(eclipse.id) || 0;
-  const paths = [];
-  const add = (name, points, stroke) => {
-    if (!points || points.length < 2) return;
-    paths.push({
-      kind: 'eclipse-boundary',
-      id: `${eclipse.id}-${name}-${revision}`,
-      color: colors.band,
-      stroke,
-      points: points.map(([lat, lng]) => ({
-        lat, lng, alt: 0.010 + eclipseIndex * 0.00045
-      }))
-    });
-  };
-  add('north', edges?.north, 0.42);
-  add('south', edges?.south, 0.42);
-  return paths;
+  mesh.name = `${id}-${selection.length}`;
+  return { id, mesh, kind: 'overview' };
 }
 
 function geometryToBorderPaths(geometry, featureIndex) {
@@ -331,11 +356,35 @@ function geometryToBorderPaths(geometry, featureIndex) {
 }
 
 const pathCache = new Map();
-let nasaPathQueue = Promise.resolve();
+const pathPromiseCache = new Map();
+const nasaPathPending = [];
+let nasaPathActive = 0;
+
+function pumpNasaPathQueue() {
+  while (nasaPathActive < NASA_PATH_CONCURRENCY && nasaPathPending.length) {
+    const job = nasaPathPending.shift();
+    nasaPathActive += 1;
+    Promise.resolve()
+      .then(job.run)
+      .then(job.resolve, job.reject)
+      .finally(() => {
+        nasaPathActive -= 1;
+        pumpNasaPathQueue();
+      });
+  }
+}
+
+function enqueueNasaPath(run) {
+  return new Promise((resolve, reject) => {
+    nasaPathPending.push({ run, resolve, reject });
+    pumpNasaPathQueue();
+  });
+}
 
 function loadNasaGeometry(eclipse) {
   if (eclipse.geometry) return Promise.resolve(eclipse.geometry);
   if (pathCache.has(eclipse.id)) return Promise.resolve(pathCache.get(eclipse.id));
+  if (pathPromiseCache.has(eclipse.id)) return pathPromiseCache.get(eclipse.id);
 
   const run = () => new Promise((resolve, reject) => {
     const token = `${eclipse.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -427,8 +476,8 @@ function loadNasaGeometry(eclipse) {
     document.body.appendChild(iframe);
   });
 
-  const promise = nasaPathQueue.then(run, run);
-  nasaPathQueue = promise.catch(() => {});
+  const promise = enqueueNasaPath(run).finally(() => pathPromiseCache.delete(eclipse.id));
+  pathPromiseCache.set(eclipse.id, promise);
   return promise;
 }
 
@@ -473,6 +522,32 @@ function formatWidth(value) {
   return Number.isFinite(Number(value)) ? `${String(value).replace('.', ',')} km` : 'largeur n/d';
 }
 
+function toRoman(value) {
+  const table = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+    [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+  ];
+  let number = value;
+  let result = '';
+  table.forEach(([amount, symbol]) => {
+    while (number >= amount) {
+      result += symbol;
+      number -= amount;
+    }
+  });
+  return result;
+}
+
+function centuryInfo(year) {
+  if (year > 0) {
+    const number = Math.floor((year - 1) / 100) + 1;
+    return { key: `ce-${number}`, label: `${toRoman(number)}e siècle` };
+  }
+  const historicalBceYear = 1 - year;
+  const number = Math.floor((historicalBceYear - 1) / 100) + 1;
+  return { key: `bce-${number}`, label: `${toRoman(number)}e siècle av. J.-C.` };
+}
+
 function normalizeSearch(value) {
   return String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 }
@@ -485,7 +560,8 @@ function matchesSearch(eclipse, query) {
     eclipse.saros,
     eclipse.catalogNumber,
     eclipse.continent,
-    eclipse.typeCode
+    eclipse.typeCode,
+    eclipse.centuryLabel
   ].join(' '));
   return haystack.includes(query);
 }
@@ -507,7 +583,7 @@ const globe = Globe()(document.getElementById('globe'))
   .pathColor(path => path.color)
   .pathStroke(path => path.stroke)
   .pathResolution(0.5)
-  .pathTransitionDuration(1250);
+  .pathTransitionDuration(900);
 
 globe.controls().enableDamping = true;
 globe.controls().dampingFactor = 0.08;
@@ -534,12 +610,10 @@ let eclipses = [];
 let selectedIds = new Set();
 let borderPaths = [];
 let activeCustomItems = [];
-let activeEclipsePaths = [];
 let bordersLoaded = false;
 let catalogLoaded = false;
 let chronoVisibleCount = CHRONO_PAGE_SIZE;
 let renderRevision = 0;
-let currentRenderMode = 'detail';
 const lineAnimationRevision = new Map();
 
 function updateStatus(extra = '') {
@@ -547,8 +621,7 @@ function updateStatus(extra = '') {
   const selected = selectedIds.size;
   const catalogText = catalogLoaded ? `${selected}/${eclipses.length} sélectionnées` : 'catalogue …';
   const borderText = bordersLoaded ? (bordersVisible ? 'frontières ✓' : 'frontières masquées') : 'frontières …';
-  const modeText = currentRenderMode === 'overview' ? 'aperçu maxima' : 'bandes détaillées';
-  layerStatus.textContent = `${catalogText} · ${modeText} · ${borderText} · build ${BUILD}${extra ? ` · ${extra}` : ''}`;
+  layerStatus.textContent = `${catalogText} · bandes détaillées · ${borderText} · build ${BUILD}${extra ? ` · ${extra}` : ''}`;
 }
 
 function disposeCustomItems(items) {
@@ -569,8 +642,7 @@ function setCustomItems(items) {
 }
 
 function refreshPaths() {
-  const visibleBorders = bordersVisible ? borderPaths : [];
-  globe.pathsData([...visibleBorders, ...activeEclipsePaths]);
+  globe.pathsData(bordersVisible ? borderPaths : []);
 }
 
 function selectedEclipses() {
@@ -586,86 +658,91 @@ function updateSelectionStats(selection) {
   focusBtn.disabled = selection.length === 0;
 }
 
+function detailedItemsFromResults(selection, results, includePending = true) {
+  const entries = [];
+  const unresolved = [];
+  results.forEach((result, index) => {
+    if (result?.status === 'fulfilled') {
+      entries.push({ eclipse: selection[index], index, edges: result.value });
+    } else if (includePending || result?.status === 'rejected') {
+      unresolved.push(selection[index]);
+    }
+  });
+
+  const ribbon = makeCombinedRibbonItem(entries, selection.length);
+  const lines = makeCombinedLineItem(entries);
+  const overview = makeOverviewItem(unresolved, 'pending-or-fallback');
+  return [ribbon, lines, overview].filter(Boolean);
+}
+
 async function applySelection({ focus = false } = {}) {
   const revision = ++renderRevision;
   const selection = selectedEclipses();
   updateSelectionStats(selection);
 
   if (selection.length === 0) {
-    currentRenderMode = 'detail';
-    activeEclipsePaths = [];
     setCustomItems([]);
     refreshPaths();
     subtitle.textContent = 'Coche une ou plusieurs éclipses pour les afficher.';
-    catalogHint.textContent = `Les bandes NASA détaillées sont chargées à la demande jusqu’à ${DETAILED_SELECTION_LIMIT} sélections.`;
+    catalogHint.textContent = 'Les bandes NASA détaillées sont chargées à la demande, sans limite de nombre d’éclipses.';
     updateStatus();
     if (focus) focusOnSelection();
     return;
   }
 
-  if (selection.length > DETAILED_SELECTION_LIMIT) {
-    currentRenderMode = 'overview';
-    activeEclipsePaths = [];
-    const overview = makeOverviewItem(selection);
-    setCustomItems(overview ? [overview] : []);
-    refreshPaths();
-    subtitle.textContent = `${selection.length.toLocaleString('fr-FR')} éclipses : aperçu des points de maximum NASA.`;
-    catalogHint.textContent = `Au-delà de ${DETAILED_SELECTION_LIMIT} sélections, les maxima sont affichés en aperçu pour garder le globe fluide.`;
-    updateStatus();
-    if (focus) focusOnSelection();
-    return;
-  }
+  const results = new Array(selection.length);
+  let completed = 0;
+  let lastPaintCompleted = -1;
+  let lastPaintAt = 0;
+  const paintEvery = Math.max(1, Math.ceil(selection.length / 18));
 
-  currentRenderMode = 'detail';
-  subtitle.textContent = `Chargement des trajectoires NASA pour ${selection.length} éclipse${selection.length > 1 ? 's' : ''}…`;
-  updateStatus('chargement');
+  setCustomItems([makeOverviewItem(selection, 'loading')].filter(Boolean));
+  refreshPaths();
+  subtitle.textContent = `Chargement des trajectoires NASA : 0 / ${selection.length.toLocaleString('fr-FR')}…`;
+  updateStatus(`chargement 0/${selection.length}`);
+  if (focus) focusOnSelection();
 
-  const results = await Promise.allSettled(selection.map(ensureGeometry));
-  if (revision !== renderRevision) return;
+  const paintProgress = (force = false) => {
+    if (revision !== renderRevision) return;
+    const now = Date.now();
+    if (!force && completed !== selection.length && completed - lastPaintCompleted < paintEvery && now - lastPaintAt < 900) return;
+    lastPaintCompleted = completed;
+    lastPaintAt = now;
+    setCustomItems(detailedItemsFromResults(selection, results, true));
+    subtitle.textContent = `Chargement des bandes détaillées : ${completed.toLocaleString('fr-FR')} / ${selection.length.toLocaleString('fr-FR')}…`;
+    updateStatus(`chargement ${completed}/${selection.length}`);
+  };
 
-  const customItems = [];
-  const paths = [];
-  const failures = [];
-
-  results.forEach((result, index) => {
-    const eclipse = selection[index];
-    if (result.status !== 'fulfilled') {
-      console.warn('Trajectoire indisponible', eclipse.nasaId, result.reason);
-      failures.push(eclipse);
-      return;
+  const tasks = selection.map(async (eclipse, index) => {
+    try {
+      results[index] = { status: 'fulfilled', value: await ensureGeometry(eclipse) };
+    } catch (reason) {
+      console.warn('Trajectoire indisponible', eclipse.nasaId, reason);
+      results[index] = { status: 'rejected', reason };
+    } finally {
+      completed += 1;
+      paintProgress(false);
     }
-
-    const edges = result.value;
-    const ribbon = makeRibbonMesh(eclipse, index, edges);
-    if (ribbon) {
-      customItems.push(ribbon);
-    } else {
-      paths.push(...boundaryFallbackPaths(eclipse, index, edges));
-    }
-    const center = centerLinePath(eclipse, index, edges);
-    if (center) paths.push(center);
   });
 
-  if (failures.length) {
-    const fallback = makeOverviewItem(failures);
-    if (fallback) customItems.push(fallback);
-  }
+  await Promise.all(tasks);
+  if (revision !== renderRevision) return;
 
-  activeEclipsePaths = paths;
-  setCustomItems(customItems);
-  refreshPaths();
+  paintProgress(true);
+  const failures = results.filter(result => result?.status === 'rejected').length;
+  const detailed = selection.length - failures;
 
-  if (failures.length) {
-    subtitle.textContent = `${selection.length - failures.length} bande${selection.length - failures.length > 1 ? 's' : ''} détaillée${selection.length - failures.length > 1 ? 's' : ''}, ${failures.length} maximum${failures.length > 1 ? 's' : ''} en secours.`;
+  if (failures) {
+    subtitle.textContent = `${detailed.toLocaleString('fr-FR')} bande${detailed > 1 ? 's' : ''} détaillée${detailed > 1 ? 's' : ''}, ${failures.toLocaleString('fr-FR')} maximum${failures > 1 ? 's' : ''} en secours.`;
   } else if (selection.length === 1) {
     subtitle.textContent = `Bande de totalité du ${selection[0].displayDate}.`;
   } else {
-    subtitle.textContent = `${selection.length} bandes de totalité affichées simultanément.`;
+    subtitle.textContent = `${selection.length.toLocaleString('fr-FR')} bandes de totalité affichées simultanément.`;
   }
 
-  catalogHint.textContent = `Trajectoires détaillées chargées à la demande depuis les données NASA. Limite d’affichage détaillé : ${DETAILED_SELECTION_LIMIT}.`;
+  const lod = ribbonLod(selection.length);
+  catalogHint.textContent = `Aucune limite de sélection. Les bandes utilisent un niveau de détail adaptatif (${lod.maxSamples} points max. par bord actuellement) pour garder le globe utilisable.`;
   updateStatus();
-  if (focus) focusOnSelection();
 }
 
 function focusOnSelection() {
@@ -712,7 +789,7 @@ function makeEclipseRow(eclipse) {
 
   const text = document.createElement('span');
   text.className = 'eclipse-option-text';
-  text.innerHTML = `<strong>${eclipse.displayDate}</strong><small>${eclipse.continent} · Saros ${eclipse.saros} · ${formatWidth(eclipse.maxPathWidthKm)} · ${formatDuration(eclipse.maxDuration)}</small>`;
+  text.innerHTML = `<strong>${eclipse.displayDate}</strong><small>${eclipse.continent} · ${eclipse.centuryLabel} · Saros ${eclipse.saros} · ${formatWidth(eclipse.maxPathWidthKm)} · ${formatDuration(eclipse.maxDuration)}</small>`;
 
   row.append(input, swatch, text);
   return row;
@@ -743,28 +820,25 @@ function renderContinentCatalog() {
     if (!group.length) return;
 
     const details = document.createElement('details');
-    details.className = 'continent-group';
-
+    details.className = 'catalog-group';
     const summary = document.createElement('summary');
     summary.innerHTML = `<span>${continent}</span><small>${group.length.toLocaleString('fr-FR')} éclipses</small>`;
     details.appendChild(summary);
 
     const body = document.createElement('div');
-    body.className = 'continent-body';
-    body.dataset.continent = continent;
-    body.innerHTML = `<button class="continent-show-btn" type="button" data-continent="${continent}">Afficher seulement ${continent}</button><div class="continent-rows"></div>`;
+    body.className = 'group-body';
+    body.innerHTML = `<button class="group-show-btn continent-show-btn" type="button" data-continent="${continent}">Afficher seulement ${continent}</button><div class="group-rows"></div>`;
     details.appendChild(body);
 
     details.addEventListener('toggle', () => {
       if (!details.open) return;
-      const rows = body.querySelector('.continent-rows');
+      const rows = body.querySelector('.group-rows');
       if (rows.dataset.rendered === '1') return;
       const rowsFragment = document.createDocumentFragment();
       group.forEach(eclipse => rowsFragment.appendChild(makeEclipseRow(eclipse)));
       rows.appendChild(rowsFragment);
       rows.dataset.rendered = '1';
     });
-
     fragment.appendChild(details);
   });
 
@@ -773,15 +847,63 @@ function renderContinentCatalog() {
   catalogHint.textContent = `${filtered.length.toLocaleString('fr-FR')} éclipses réparties par continent principal, selon le point de maximum.`;
 }
 
+function renderCenturyCatalog() {
+  const filtered = filteredEclipses();
+  const groups = new Map();
+  filtered.forEach(eclipse => {
+    if (!groups.has(eclipse.centuryKey)) groups.set(eclipse.centuryKey, []);
+    groups.get(eclipse.centuryKey).push(eclipse);
+  });
+
+  const fragment = document.createDocumentFragment();
+  groups.forEach((group, centuryKey) => {
+    const label = group[0].centuryLabel;
+    const details = document.createElement('details');
+    details.className = 'catalog-group';
+    const summary = document.createElement('summary');
+    summary.innerHTML = `<span>${label}</span><small>${group.length.toLocaleString('fr-FR')} éclipses</small>`;
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'group-body';
+    body.innerHTML = `<button class="group-show-btn century-show-btn" type="button" data-century="${centuryKey}">Afficher seulement ce siècle</button><div class="group-rows"></div>`;
+    details.appendChild(body);
+
+    details.addEventListener('toggle', () => {
+      if (!details.open) return;
+      const rows = body.querySelector('.group-rows');
+      if (rows.dataset.rendered === '1') return;
+      const rowsFragment = document.createDocumentFragment();
+      group.forEach(eclipse => rowsFragment.appendChild(makeEclipseRow(eclipse)));
+      rows.appendChild(rowsFragment);
+      rows.dataset.rendered = '1';
+    });
+    fragment.appendChild(details);
+  });
+
+  catalogList.replaceChildren(fragment);
+  loadMoreBtn.hidden = true;
+  catalogHint.textContent = `${filtered.length.toLocaleString('fr-FR')} éclipses regroupées chronologiquement par siècle.`;
+}
+
 function renderCatalog() {
   if (!catalogLoaded) return;
   if (catalogMode.value === 'continent') renderContinentCatalog();
+  else if (catalogMode.value === 'century') renderCenturyCatalog();
   else renderChronologicalCatalog();
 }
 
 function selectOnlyContinent(continent, { focus = true } = {}) {
   selectedIds = new Set(
     eclipses.filter(eclipse => eclipse.continent === continent).map(eclipse => eclipse.id)
+  );
+  renderCatalog();
+  applySelection({ focus });
+}
+
+function selectOnlyCentury(centuryKey, { focus = true } = {}) {
+  selectedIds = new Set(
+    eclipses.filter(eclipse => eclipse.centuryKey === centuryKey).map(eclipse => eclipse.id)
   );
   renderCatalog();
   applySelection({ focus });
@@ -803,11 +925,9 @@ async function loadCountries() {
     const response = await fetch(COUNTRIES_GEOJSON, { mode: 'cors', cache: 'force-cache' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const geojson = await response.json();
-
     borderPaths = geojson.features.flatMap((feature, featureIndex) =>
       geometryToBorderPaths(feature.geometry, featureIndex)
     );
-
     bordersLoaded = true;
     refreshPaths();
     updateStatus();
@@ -851,9 +971,12 @@ async function loadCatalog() {
 
     eclipses = catalog.eclipses.map(meta => {
       const local = localData.get(meta.nasaId);
+      const century = centuryInfo(meta.year);
       return {
         ...meta,
         displayDate: formatDate(meta),
+        centuryKey: century.key,
+        centuryLabel: century.label,
         name: 'Éclipse solaire totale',
         path: local?.path || null,
         maxPathWidthKm: local?.stats?.maxPathWidthKm ?? meta.maxPathWidthKm,
@@ -895,10 +1018,18 @@ catalogList.addEventListener('change', event => {
 });
 
 catalogList.addEventListener('click', event => {
-  const button = event.target.closest('.continent-show-btn');
-  if (!button) return;
-  event.preventDefault();
-  selectOnlyContinent(button.dataset.continent);
+  const continentButton = event.target.closest('.continent-show-btn');
+  if (continentButton) {
+    event.preventDefault();
+    selectOnlyContinent(continentButton.dataset.continent);
+    return;
+  }
+
+  const centuryButton = event.target.closest('.century-show-btn');
+  if (centuryButton) {
+    event.preventDefault();
+    selectOnlyCentury(centuryButton.dataset.century);
+  }
 });
 
 catalogMode.addEventListener('change', () => {
