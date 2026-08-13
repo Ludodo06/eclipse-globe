@@ -5,9 +5,13 @@
     catch { return Date.now(); }
   })();
   const CATALOG_URL = `./data/nasa-total-eclipses.json?v=${version}`;
-  const SPECIAL = {
+  const SPECIAL_OLD = {
     '20260812': '#9b6cff',
     '20270802': '#ff8a3d'
+  };
+  const SPECIAL_NEW = {
+    '20260812': '#b45cff',
+    '20270802': '#ff7a1a'
   };
 
   const state = {
@@ -27,12 +31,21 @@
   }
 
   function originalStyle(meta) {
-    if (SPECIAL[meta.nasaId]) return SPECIAL[meta.nasaId];
+    if (SPECIAL_OLD[meta.nasaId]) return SPECIAL_OLD[meta.nasaId];
     const n = meta.catalogNumber || hashString(meta.id);
     const hue = (n * 137.50776405) % 360;
     const saturation = 72 + (n % 13);
     const lightness = 48 + (n % 9);
     return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`;
+  }
+
+  function stableColor(meta) {
+    const color = new state.THREE.Color();
+    if (SPECIAL_NEW[meta.nasaId]) return color.set(SPECIAL_NEW[meta.nasaId]);
+    const n = meta.catalogNumber || hashString(meta.id);
+    const hue = (n * 137.50776405) % 360;
+    const lightness = [0.56, 0.62, 0.68][n % 3];
+    return color.setHSL(hue / 360, 0.96, lightness);
   }
 
   function colorKey(r, g, b) {
@@ -77,7 +90,7 @@
     return state.byColor.get(vertexColorKey(raw, vertex)) || null;
   }
 
-  function writeIdentity(items, snapshots) {
+  function finalizeRibbons(items, snapshots) {
     if (!state.ready || !state.THREE) return;
 
     for (const item of items || []) {
@@ -92,13 +105,16 @@
       for (const segment of segmentRanges(alpha, color.count)) {
         const meta = identifyFromRawColor(raw, segment.start);
         if (!meta) continue;
+        const stable = stableColor(meta);
         for (let vertex = segment.start; vertex < segment.end; vertex += 1) {
           keys[vertex] = meta._hoverKey;
+          color.setXYZ(vertex, stable.r, stable.g, stable.b);
         }
       }
 
       geometry.setAttribute('aEclipseKey', new state.THREE.Float32BufferAttribute(keys, 1));
       geometry.getAttribute('aEclipseKey').needsUpdate = true;
+      color.needsUpdate = true;
     }
   }
 
@@ -112,7 +128,7 @@
       const items = Array.isArray(value) ? value : [];
       const raw = snapshot(items);
       const result = previous(value);
-      writeIdentity(items, raw);
+      finalizeRibbons(items, raw);
       return result;
     };
   }
