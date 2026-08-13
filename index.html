@@ -44,7 +44,7 @@
     .right-header { align-items:center; margin-bottom:10px; }
     .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; flex:0 0 auto; font-size:17px; }
 
-    /* Le catalogue utilise une vraie grille à hauteur bornée : seule la liste scrolle. */
+    /* En-tête et filtres fixes ; la liste prend exactement l'espace restant et scrolle. */
     details.catalog[open] {
       display:grid !important; grid-template-rows:auto minmax(0,1fr) !important;
       min-height:0 !important; overflow:hidden !important; border-top:1px solid rgba(255,255,255,.08);
@@ -104,7 +104,6 @@
     .info-table dt { color:#7f91a7; font-size:10px; }
     .info-table dd { margin:0; color:#eef3fa; text-align:right; font-size:10px; font-weight:680; }
     .info-foot { margin-top:8px; padding-top:7px; border-top:1px solid rgba(255,255,255,.08); color:#718298; font-size:8.5px; }
-
     .visible-card { margin-top:9px; overflow:hidden; }
     .visible-head { display:flex; justify-content:space-between; align-items:center; padding:9px 10px; border-bottom:1px solid rgba(255,255,255,.07); color:#cbd5e2; font-size:10px; }
     .visible-head span { color:#8294aa; }
@@ -115,7 +114,6 @@
     .visible-dot { width:8px; height:8px; border-radius:50%; }
     .visible-date { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
     .visible-meta { color:#8294aa; font-size:8.5px; }
-
     .settings-card { margin-top:9px; padding:10px; }
     .settings-title { margin:0 0 8px; color:#cbd5e2; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
@@ -145,7 +143,7 @@
       background:rgba(7,12,20,.88); backdrop-filter:blur(16px); box-shadow:0 10px 34px rgba(0,0,0,.35);
     }
     .panel-launchers button { white-space:nowrap; padding:9px 12px; font-size:11px; }
-    body.panel-active .panel-launchers { display:none; }
+    .panel-launchers button[aria-pressed="true"] { background:#263a57; border-color:rgba(255,255,255,.28); }
 
     @media (max-width:980px) {
       .hint { display:none; }
@@ -153,6 +151,7 @@
       .panel-left { left:10px; right:auto; transform:translateX(calc(-100% - 24px)); }
       .panel-right { right:10px; left:auto; transform:translateX(calc(100% + 24px)); }
       .panel-launchers { top:auto; bottom:max(14px,env(safe-area-inset-bottom)); }
+      body.mobile-panel-active .panel-launchers { display:none; }
     }
     @media (max-width:520px) {
       .panel { border-radius:14px; }
@@ -203,16 +202,13 @@
     <aside id="displayPanel" class="panel panel-right" aria-hidden="true">
       <div class="panel-pad">
         <div class="right-header"><div><p class="panel-kicker">Vue</p><h2>Infos & affichage</h2></div><button id="rightPanelClose" class="icon-btn" type="button" aria-label="Fermer">×</button></div>
-
         <section id="eclipseInfoCard" class="info-card" aria-live="polite">
           <div id="eclipseInfoContent" class="info-empty"><strong>Aucune éclipse pointée</strong>Survole une bande sur le globe pour afficher ses informations. Sur mobile, touche une bande pour l’épingler ici.</div>
         </section>
-
         <section id="visibleEclipsesCard" class="visible-card">
           <div class="visible-head"><strong>Éclipses affichées</strong><span id="visibleEclipsesCount">0</span></div>
           <div id="visibleEclipsesList" class="visible-list"><div class="visible-empty">La sélection apparaîtra ici, par ordre chronologique.</div></div>
         </section>
-
         <section class="settings-card">
           <p class="settings-title">Affichage</p>
           <div class="action-grid"><button id="focusBtn" type="button">Centrer sélection</button><button id="resetViewBtn" type="button">Vue globale</button></div>
@@ -221,7 +217,6 @@
           <div class="toggle-row"><label for="centerLinesToggle">Lignes centrales</label><input id="centerLinesToggle" type="checkbox" checked /></div>
           <div class="range-row"><div class="range-label"><span>Opacité des bandes</span><span id="bandOpacityValue">74 %</span></div><input id="bandOpacity" type="range" min="15" max="100" value="74" step="1" /></div>
         </section>
-
         <section class="stats-card"><div class="stat"><strong id="selectedCount">0</strong><span>éclipses sélectionnées</span></div><div class="stat"><strong id="maxDuration">—</strong><span>totalité max.</span></div></section>
         <div class="legend"><span class="legend-chip"><i class="gradient-chip"></i>couleur = éclipse</span><span class="legend-chip"><i class="line-white"></i>frontières</span></div>
         <div id="layerStatus" class="status">catalogue … · frontières …</div>
@@ -229,19 +224,20 @@
       </div>
     </aside>
 
-    <div id="panelLaunchers" class="panel-launchers" aria-label="Ouvrir un panneau">
-      <button id="openSelectionPanel" type="button">Éclipses</button>
-      <button id="openInfoPanel" type="button">Infos & affichage</button>
+    <div id="panelLaunchers" class="panel-launchers" aria-label="Afficher ou masquer les panneaux">
+      <button id="openSelectionPanel" type="button" aria-pressed="false">Éclipses</button>
+      <button id="openInfoPanel" type="button" aria-pressed="false">Infos & affichage</button>
     </div>
 
     <div class="hint">Glisser pour tourner · pincer / molette pour zoomer · survoler une bande pour les détails</div>
   </div>
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
-  <script src="./enhancements.js?v=18"></script>
-  <script src="./selection-list.js?v=18"></script>
+  <script src="./enhancements.js?v=19"></script>
+  <script src="./selection-list.js?v=19"></script>
   <script>
     (() => {
+      const mobile = window.matchMedia('(max-width: 980px)');
       const selection = document.getElementById('selectionPanel');
       const info = document.getElementById('displayPanel');
       const openSelection = document.getElementById('openSelectionPanel');
@@ -249,70 +245,91 @@
       const closeSelection = document.getElementById('selectionPanelClose');
       const closeInfo = document.getElementById('rightPanelClose');
       const legacyInfoToggle = document.getElementById('rightPanelToggle');
-      let active = null;
       let internalClassChange = false;
 
-      /* selection-list.js injecte une ancienne correction flex. Cette règle, injectée après,
-         force la grille bornée et garantit le scroll de la liste sur desktop et mobile. */
+      /* selection-list.js injecte encore une ancienne règle flex : cette règle tardive gagne. */
       const scrollOverride = document.createElement('style');
       scrollOverride.id = 'catalogGridScrollOverride';
       scrollOverride.textContent = `
         #selectionPanel { display:grid !important; grid-template-rows:auto minmax(0,1fr) !important; overflow:hidden !important; min-height:0 !important; }
         #selectionPanel details.catalog[open] { display:grid !important; grid-template-rows:auto minmax(0,1fr) !important; min-height:0 !important; overflow:hidden !important; }
         #selectionPanel .catalog-body { display:grid !important; grid-template-rows:auto minmax(0,1fr) auto auto !important; min-height:0 !important; overflow:hidden !important; }
-        #selectionPanel .catalog-list { min-height:0 !important; height:100% !important; overflow-y:auto !important; overflow-x:hidden !important; }
+        #selectionPanel .catalog-list { min-height:0 !important; height:100% !important; max-height:none !important; overflow-y:scroll !important; overflow-x:hidden !important; }
       `;
       document.head.appendChild(scrollOverride);
 
+      const isOpen = panel => panel.classList.contains('panel-open');
+
       function syncState() {
-        selection.setAttribute('aria-hidden', active === 'selection' ? 'false' : 'true');
-        info.setAttribute('aria-hidden', active === 'info' ? 'false' : 'true');
-        document.body.classList.toggle('panel-active', active !== null);
-        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', active === 'info' ? 'true' : 'false');
+        const selectionOpen = isOpen(selection);
+        const infoOpen = isOpen(info);
+        selection.setAttribute('aria-hidden', selectionOpen ? 'false' : 'true');
+        info.setAttribute('aria-hidden', infoOpen ? 'false' : 'true');
+        openSelection.setAttribute('aria-pressed', selectionOpen ? 'true' : 'false');
+        openInfo.setAttribute('aria-pressed', infoOpen ? 'true' : 'false');
+        document.body.classList.toggle('mobile-panel-active', mobile.matches && (selectionOpen || infoOpen));
+        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', infoOpen ? 'true' : 'false');
       }
 
-      function closeAll() {
+      function setPanel(panel, open) {
         internalClassChange = true;
-        selection.classList.remove('panel-open', 'mobile-open', 'right-open');
-        info.classList.remove('panel-open', 'mobile-open', 'is-open');
-        active = null;
+        panel.classList.toggle('panel-open', open);
+        if (!open) {
+          panel.classList.remove('mobile-open');
+          if (panel === selection) panel.classList.remove('right-open');
+          if (panel === info) panel.classList.remove('is-open');
+        }
         syncState();
         requestAnimationFrame(() => { internalClassChange = false; });
       }
 
       function openPanel(which) {
-        internalClassChange = true;
-        selection.classList.remove('panel-open', 'mobile-open', 'right-open');
-        info.classList.remove('panel-open', 'mobile-open', 'is-open');
         const target = which === 'selection' ? selection : info;
-        target.classList.add('panel-open');
-        active = which;
-        syncState();
-        requestAnimationFrame(() => {
-          internalClassChange = false;
-          (which === 'selection' ? closeSelection : closeInfo)?.focus({ preventScroll:true });
-        });
+        const other = which === 'selection' ? info : selection;
+        if (mobile.matches) setPanel(other, false);
+        setPanel(target, true);
+        requestAnimationFrame(() => (which === 'selection' ? closeSelection : closeInfo)?.focus({ preventScroll:true }));
+      }
+
+      function closePanel(which) {
+        setPanel(which === 'selection' ? selection : info, false);
       }
 
       openSelection.addEventListener('click', () => openPanel('selection'));
       openInfo.addEventListener('click', () => openPanel('info'));
-      closeSelection.addEventListener('click', closeAll);
-      closeInfo.addEventListener('click', closeAll);
+      closeSelection.addEventListener('click', () => closePanel('selection'));
+      closeInfo.addEventListener('click', () => closePanel('info'));
 
-      /* enhancements.js peut demander l'ouverture du panneau infos après un tap.
-         On l'autorise seulement si aucun autre panneau n'est déjà ouvert. */
+      /* Un tap sur une bande peut demander l'ouverture du panneau infos via enhancements.js. */
       const infoObserver = new MutationObserver(() => {
-        if (internalClassChange) return;
-        if (info.classList.contains('is-open')) {
-          if (active === null || active === 'info') openPanel('info');
-          else info.classList.remove('is-open');
+        if (internalClassChange || !info.classList.contains('is-open')) return;
+        if (mobile.matches && isOpen(selection)) {
+          internalClassChange = true;
+          info.classList.remove('is-open');
+          selection.classList.remove('right-open');
+          requestAnimationFrame(() => { internalClassChange = false; });
+          return;
         }
+        openPanel('info');
       });
       infoObserver.observe(info, { attributes:true, attributeFilter:['class'] });
 
-      closeAll();
+      function initializeForViewport() {
+        internalClassChange = true;
+        selection.classList.remove('mobile-open','right-open','panel-open');
+        info.classList.remove('mobile-open','is-open','panel-open');
+        if (!mobile.matches) {
+          selection.classList.add('panel-open');
+          info.classList.add('panel-open');
+        }
+        syncState();
+        requestAnimationFrame(() => { internalClassChange = false; });
+      }
+
+      mobile.addEventListener?.('change', initializeForViewport);
+      initializeForViewport();
     })();
   </script>
-  <script type="module" src="./app.js?v=18"></script>
+  <script type="module" src="./app.js?v=19"></script>
 </body>
 </html>
