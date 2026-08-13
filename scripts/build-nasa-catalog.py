@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 CATALOG_URL = "https://eclipse.gsfc.nasa.gov/5MCSE/5MCSEcatalog.txt"
+CACHE_URL = "https://ludodo06.github.io/eclipse-globe/data/nasa-total-eclipses.json"
 OUT_PATH = Path("data/nasa-total-eclipses.json")
 EXPECTED_TOTALS = 3173
 MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
@@ -63,17 +64,13 @@ def parse_catalog(text):
                 year_idx=i; break
         if year_idx is None: continue
         type_idx=year_idx+7
-        if len(parts) <= type_idx or not parts[type_idx].startswith("T"):
-            continue
-        # We need through Sun azimuth. One-limit/non-central totals may omit width/duration.
-        if len(parts) <= type_idx+6:
-            continue
+        if len(parts) <= type_idx or not parts[type_idx].startswith("T"): continue
+        if len(parts) <= type_idx+6: continue
 
         try:
             year=int(parts[year_idx]); month=MONTHS[parts[year_idx+1]]; day=int(parts[year_idx+2]); time_tdt=parts[year_idx+3]
             delta_t=maybe_float(parts[year_idx+4]); lunation=int(parts[year_idx+5]); saros=int(parts[year_idx+6])
-            subtype=parts[type_idx]
-            gamma=maybe_float(parts[type_idx+1]); magnitude=maybe_float(parts[type_idx+2])
+            subtype=parts[type_idx]; gamma=maybe_float(parts[type_idx+1]); magnitude=maybe_float(parts[type_idx+2])
             lat=parse_coord(parts[type_idx+3]); lng=parse_coord(parts[type_idx+4])
             sun_alt=maybe_float(parts[type_idx+5]); sun_azm=maybe_float(parts[type_idx+6])
             width=maybe_float(parts[type_idx+7]) if len(parts)>type_idx+7 else None
@@ -95,17 +92,37 @@ def parse_catalog(text):
     return totals
 
 
+def write_payload(payload, source_label):
+    eclipses = payload.get("eclipses") if isinstance(payload, dict) else None
+    if not isinstance(eclipses, list) or len(eclipses) != EXPECTED_TOTALS:
+        raise ValueError(f"{source_label} contains {len(eclipses) if isinstance(eclipses, list) else 0} eclipses")
+    OUT_PATH.parent.mkdir(parents=True,exist_ok=True)
+    OUT_PATH.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+    print(f"Generated {OUT_PATH} with {len(eclipses)} total solar eclipses ({source_label})")
+
+
+def try_published_cache():
+    try:
+        req=urllib.request.Request(CACHE_URL,headers={"User-Agent":"EclipseGlobeCatalogBuilder/1.0","Cache-Control":"no-cache"})
+        with urllib.request.urlopen(req,timeout=15) as r:
+            payload=json.loads(r.read().decode("utf-8"))
+        write_payload(payload,"validated Pages cache")
+        return True
+    except Exception as exc:
+        print(f"Published cache unavailable or invalid: {exc}. Falling back to NASA ASCII source.")
+        return False
+
+
 def main():
+    if try_published_cache():
+        return
+
     req=urllib.request.Request(CATALOG_URL,headers={"User-Agent":"EclipseGlobeCatalogBuilder/1.0"})
-    with urllib.request.urlopen(req,timeout=60) as r: raw=r.read()
+    with urllib.request.urlopen(req,timeout=45) as r: raw=r.read()
     totals=parse_catalog(raw.decode("latin-1"))
     if len(totals)!=EXPECTED_TOTALS:
         raise RuntimeError(f"NASA catalog parser found {len(totals)} total eclipses; expected {EXPECTED_TOTALS}. Refusing to publish an incomplete catalog.")
     payload={"source":{"publisher":"NASA GSFC / Fred Espenak & Jean Meeus","title":"Five Millennium Catalog of Solar Eclipses: -1999 to +3000","url":CATALOG_URL,"totalCount":EXPECTED_TOTALS,"continentGrouping":"nearest principal continent to the point of greatest eclipse"},"eclipses":totals}
-    OUT_PATH.parent.mkdir(parents=True,exist_ok=True)
-    OUT_PATH.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
-    print(f"Generated {OUT_PATH} with {len(totals)} total solar eclipses")
-    print("2026:",next(x for x in totals if x["nasaId"]=="20260812"))
-    print("2027:",next(x for x in totals if x["nasaId"]=="20270802"))
+    write_payload(payload,"NASA 5MCSE ASCII")
 
 if __name__=="__main__": main()
