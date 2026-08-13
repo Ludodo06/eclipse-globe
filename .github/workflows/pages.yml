@@ -43,6 +43,59 @@ jobs:
                   raise SystemExit(f'BUILD constant not found exactly once in {filename}')
               path.write_text(text, encoding='utf-8')
 
+          # Une sélection filtrée est appliquée en une seule opération dans le moteur 3D.
+          app = Path('app.js')
+          app_text = app.read_text(encoding='utf-8')
+          app_text += r'''
+
+document.addEventListener('eclipse-replace-selection', event => {
+  const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
+  const requested = new Set(ids);
+  selectedIds = new Set(
+    eclipses.filter(eclipse => requested.has(eclipse.id)).map(eclipse => eclipse.id)
+  );
+  selectedIds.forEach(id => {
+    lineAnimationRevision.set(id, (lineAnimationRevision.get(id) || 0) + 1);
+  });
+  renderCatalog();
+  applySelection();
+});
+'''
+          app.write_text(app_text, encoding='utf-8')
+
+          # Le panneau gauche garde son état de cases synchronisé avec la sélection groupée.
+          selector = Path('selector-ui.js')
+          selector_text = selector.read_text(encoding='utf-8')
+          selector_hook = r'''
+
+  document.addEventListener('eclipse-replace-selection', event => {
+    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
+    state.selectedIds = new Set(ids);
+    renderDetail();
+  });
+'''
+          if not selector_text.rstrip().endswith('})();'):
+              raise SystemExit('selector-ui.js ending not recognized')
+          selector_text = selector_text.rstrip()[:-5] + selector_hook + '\n})();\n'
+          selector.write_text(selector_text, encoding='utf-8')
+
+          # La liste de droite se synchronise sans reconstruire l'identité des bandes.
+          selection_list = Path('selection-list.js')
+          selection_text = selection_list.read_text(encoding='utf-8')
+          selection_hook = r'''
+
+  document.addEventListener('eclipse-replace-selection', event => {
+    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
+    state.selectedIds = new Set(ids.filter(id => state.byId.has(id)));
+    if (!state.selectedIds.has(state.focusedId)) state.focusedId = null;
+    renderSelection();
+  });
+'''
+          if not selection_text.rstrip().endswith('})();'):
+              raise SystemExit('selection-list.js ending not recognized')
+          selection_text = selection_text.rstrip()[:-5] + selection_hook + '\n})();\n'
+          selection_list.write_text(selection_text, encoding='utf-8')
+
           index = Path('index.html')
           text = index.read_text(encoding='utf-8')
           for script in ('enhancements.js', 'selection-list.js', 'app.js'):
@@ -67,7 +120,7 @@ jobs:
           print(f'Deploying build {build}')
           PY
       - name: Check JavaScript syntax
-        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js && node --check panel-controls.js
+        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js && node --check panel-controls.js && node --check period-slider.js && node --check display-selection.js && node --check stable-identity.js && node --check century-labels.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
