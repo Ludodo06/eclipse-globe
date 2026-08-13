@@ -1,5 +1,5 @@
 (() => {
-  const BUILD = 13;
+  const BUILD = 14;
   const CATALOG_URL = `./data/nasa-total-eclipses.json?v=${BUILD}`;
   const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.161.0/+esm';
   const MONTH_NAMES = [
@@ -23,13 +23,15 @@
     metaByHoverKey: new Map(),
     oldBandKeyToMeta: new Map(),
     lastItems: [],
-    tooltip: null,
     pinned: false,
+    activeMetaId: null,
     raycaster: null,
     mouse: null,
     pointerDown: null,
     lastHoverRaycastAt: 0,
-    mutationObserver: null
+    mutationObserver: null,
+    centerLinesVisible: true,
+    bandOpacity: 0.74
   };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -123,8 +125,8 @@
       band.getHSL(hsl);
       line.setHSL(hsl.h, 0.98, 0.84);
     } else {
-      const lightness = [0.58, 0.63, 0.68][n % 3];
-      band.setHSL(hue / 360, 0.94, lightness);
+      const lightness = [0.56, 0.62, 0.68][n % 3];
+      band.setHSL(hue / 360, 0.96, lightness);
       line.setHSL(hue / 360, 0.98, 0.84);
     }
 
@@ -136,167 +138,76 @@
     };
   }
 
-  function installStylesAndTooltip() {
-    if (!document.getElementById('eclipseEnhancementsStyle')) {
-      const style = document.createElement('style');
-      style.id = 'eclipseEnhancementsStyle';
-      style.textContent = `
-        #eclipseTooltip {
-          position: absolute;
-          z-index: 8;
-          width: min(310px, calc(100vw - 24px));
-          padding: 12px;
-          border-radius: 13px;
-          border: 1px solid rgba(255,255,255,.18);
-          background: rgba(5, 10, 18, .96);
-          box-shadow: 0 16px 48px rgba(0,0,0,.42);
-          backdrop-filter: blur(14px);
-          color: #edf3fb;
-          font: 12px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          opacity: 0;
-          visibility: hidden;
-          pointer-events: none;
-          transition: opacity .12s ease, visibility .12s ease;
-        }
-        #eclipseTooltip.is-visible { opacity: 1; visibility: visible; }
-        #eclipseTooltip.is-pinned {
-          left: 50% !important;
-          right: auto !important;
-          top: auto !important;
-          bottom: max(14px, env(safe-area-inset-bottom));
-          transform: translateX(-50%);
-          pointer-events: auto;
-        }
-        #eclipseTooltip .eclipse-tip-head {
-          display: grid;
-          grid-template-columns: 12px minmax(0,1fr) auto;
-          gap: 9px;
-          align-items: center;
-        }
-        #eclipseTooltip .eclipse-tip-dot {
-          width: 11px;
-          height: 11px;
-          border-radius: 50%;
-          box-shadow: 0 0 0 1px rgba(255,255,255,.5);
-        }
-        #eclipseTooltip .eclipse-tip-title { font-size: 13px; font-weight: 800; }
-        #eclipseTooltip .eclipse-tip-close {
-          display: none;
-          width: 30px;
-          height: 30px;
-          padding: 0;
-          margin: -5px -4px -5px 0;
-          border: 0;
-          border-radius: 8px;
-          background: rgba(255,255,255,.07);
-          color: #dce6f3;
-          font-size: 18px;
-          line-height: 1;
-          cursor: pointer;
-        }
-        #eclipseTooltip.is-pinned .eclipse-tip-close { display: block; }
-        #eclipseTooltip .eclipse-tip-sub {
-          margin: 5px 0 10px 21px;
-          color: #93a4b9;
-          font-size: 10px;
-        }
-        #eclipseTooltip dl {
-          display: grid;
-          grid-template-columns: minmax(0,1fr) auto;
-          gap: 5px 12px;
-          margin: 0;
-        }
-        #eclipseTooltip dt { color: #8495aa; }
-        #eclipseTooltip dd { margin: 0; color: #f4f7fb; text-align: right; font-weight: 650; }
-        #eclipseTooltip .eclipse-tip-foot {
-          margin-top: 9px;
-          padding-top: 8px;
-          border-top: 1px solid rgba(255,255,255,.09);
-          color: #738399;
-          font-size: 9px;
-        }
-        @media (max-width: 600px) {
-          #eclipseTooltip { font-size: 11px; }
-          #eclipseTooltip.is-pinned { bottom: max(10px, env(safe-area-inset-bottom)); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    if (!state.tooltip) {
-      const tooltip = document.createElement('div');
-      tooltip.id = 'eclipseTooltip';
-      tooltip.setAttribute('role', 'dialog');
-      tooltip.setAttribute('aria-live', 'polite');
-      tooltip.addEventListener('click', event => {
-        if (event.target.closest('.eclipse-tip-close')) {
-          state.pinned = false;
-          hideTooltip();
-        }
-      });
-      (document.getElementById('app') || document.body).appendChild(tooltip);
-      state.tooltip = tooltip;
-    }
+  function installSmallStyles() {
+    if (document.getElementById('eclipseEnhancementsStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'eclipseEnhancementsStyle';
+    style.textContent = `
+      @media (min-width: 981px) { #rightPanelClose { display:none !important; } }
+      #displayPanel .info-unpin { width:28px; height:28px; padding:0; display:grid; place-items:center; }
+      #displayPanel .info-card.is-pinned { border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.06); }
+      #displayPanel .info-card.has-info { box-shadow:inset 3px 0 0 var(--eclipse-info-color, #fff); }
+    `;
+    document.head.appendChild(style);
   }
 
-  function renderTooltip(meta, clientX, clientY, pinned = false) {
-    if (!state.tooltip || !meta || !state.THREE) return;
-    const colors = vividColors(meta);
-    const typeCode = meta.typeCode || 'T';
-    const catalogNumber = meta.catalogNumber ?? 'n/d';
-    const continent = meta.continent || 'n/d';
-    const date = formatDate(meta);
+  function infoContent() {
+    return document.getElementById('eclipseInfoContent');
+  }
 
-    state.tooltip.innerHTML = `
-      <div class="eclipse-tip-head">
-        <span class="eclipse-tip-dot" style="background:${colors.bandCss}"></span>
-        <div class="eclipse-tip-title">${escapeHtml(date)}</div>
-        <button class="eclipse-tip-close" type="button" aria-label="Fermer">×</button>
+  function infoCard() {
+    return document.getElementById('eclipseInfoCard');
+  }
+
+  function renderInfo(meta, pinned = false) {
+    const content = infoContent();
+    const card = infoCard();
+    if (!content || !card || !meta || !state.THREE) return;
+    if (!pinned && state.activeMetaId === meta.id && !state.pinned) return;
+
+    const colors = vividColors(meta);
+    const date = formatDate(meta);
+    state.activeMetaId = meta.id;
+    state.pinned = pinned;
+
+    card.classList.add('has-info');
+    card.classList.toggle('is-pinned', pinned);
+    card.style.setProperty('--eclipse-info-color', colors.bandCss);
+    content.className = '';
+    content.innerHTML = `
+      <div class="info-head">
+        <span class="info-dot" style="background:${colors.bandCss}"></span>
+        <div class="info-title">${escapeHtml(date)}</div>
+        ${pinned
+          ? '<button class="info-unpin icon-btn" type="button" aria-label="Désépingler">×</button>'
+          : '<span class="info-mode">Survol</span>'}
       </div>
-      <div class="eclipse-tip-sub">Éclipse solaire totale · type NASA ${escapeHtml(typeCode)}</div>
-      <dl>
+      <div class="info-sub">Éclipse solaire totale · type NASA ${escapeHtml(meta.typeCode || 'T')}${pinned ? ' · épinglée' : ''}</div>
+      <dl class="info-table">
         <dt>Saros</dt><dd>${escapeHtml(meta.saros ?? 'n/d')}</dd>
         <dt>Magnitude</dt><dd>${escapeHtml(formatNumber(meta.magnitude, 4))}</dd>
         <dt>Largeur max.</dt><dd>${escapeHtml(formatWidth(meta.maxPathWidthKm))}</dd>
         <dt>Durée max.</dt><dd>${escapeHtml(formatDuration(meta.maxDuration))}</dd>
-        <dt>Continent principal</dt><dd>${escapeHtml(continent)}</dd>
+        <dt>Continent principal</dt><dd>${escapeHtml(meta.continent || 'n/d')}</dd>
         <dt>Maximum</dt><dd>${escapeHtml(formatCoords(meta.focus))}</dd>
         <dt>Gamma</dt><dd>${escapeHtml(formatNumber(meta.gamma, 4))}</dd>
+        <dt>Catalogue NASA</dt><dd>#${escapeHtml(meta.catalogNumber ?? 'n/d')}</dd>
       </dl>
-      <div class="eclipse-tip-foot">Catalogue NASA #${escapeHtml(catalogNumber)} · couleur de bande dédiée</div>
+      <div class="info-foot">Passe sur une autre bande pour changer d’éclipse${pinned ? ', ou ferme l’épingle pour reprendre le survol' : ''}.</div>
     `;
-
-    state.tooltip.classList.toggle('is-pinned', pinned);
-    state.tooltip.classList.add('is-visible');
-
-    if (pinned) {
-      state.tooltip.style.left = '';
-      state.tooltip.style.top = '';
-      state.tooltip.style.right = '';
-      return;
-    }
-
-    const app = document.getElementById('app') || document.body;
-    const appRect = app.getBoundingClientRect();
-    const localX = clientX - appRect.left;
-    const localY = clientY - appRect.top;
-    state.tooltip.style.left = `${localX + 14}px`;
-    state.tooltip.style.top = `${localY + 14}px`;
-    state.tooltip.style.right = 'auto';
-
-    const width = state.tooltip.offsetWidth;
-    const height = state.tooltip.offsetHeight;
-    let x = localX + 14;
-    let y = localY + 14;
-    if (x + width > appRect.width - 8) x = localX - width - 14;
-    if (y + height > appRect.height - 8) y = localY - height - 14;
-    state.tooltip.style.left = `${Math.max(8, x)}px`;
-    state.tooltip.style.top = `${Math.max(8, y)}px`;
   }
 
-  function hideTooltip() {
-    if (!state.tooltip) return;
-    state.tooltip.classList.remove('is-visible', 'is-pinned');
+  function clearInfo(force = false) {
+    if (state.pinned && !force) return;
+    const content = infoContent();
+    const card = infoCard();
+    if (!content || !card) return;
+    state.activeMetaId = null;
+    if (force) state.pinned = false;
+    card.classList.remove('has-info', 'is-pinned');
+    card.style.removeProperty('--eclipse-info-color');
+    content.className = 'info-empty';
+    content.innerHTML = '<strong>Aucune éclipse pointée</strong>Survole une bande sur le globe pour afficher ses informations. Sur mobile, touche une bande pour l’épingler ici.';
   }
 
   function buildCatalogMaps(catalog) {
@@ -336,6 +247,10 @@
       colorAttribute.setXYZ(i, color.r, color.g, color.b);
     }
     colorAttribute.needsUpdate = true;
+
+    if (mesh.material?.uniforms?.uOpacity) {
+      mesh.material.uniforms.uOpacity.value = state.bandOpacity;
+    }
   }
 
   function patchLineMesh(mesh) {
@@ -346,10 +261,21 @@
     for (let i = 0; i < attribute.count; i += 1) {
       color.setRGB(attribute.getX(i), attribute.getY(i), attribute.getZ(i));
       color.getHSL(hsl);
-      color.setHSL(hsl.h, 0.98, 0.82);
+      color.setHSL(hsl.h, 0.98, 0.84);
       attribute.setXYZ(i, color.r, color.g, color.b);
     }
     attribute.needsUpdate = true;
+    mesh.visible = state.centerLinesVisible;
+  }
+
+  function applyDisplaySettings(items = state.lastItems) {
+    (items || []).forEach(item => {
+      if (!item?.mesh) return;
+      if (item.kind === 'ribbons' && item.mesh.material?.uniforms?.uOpacity) {
+        item.mesh.material.uniforms.uOpacity.value = state.bandOpacity;
+      }
+      if (item.kind === 'centerlines') item.mesh.visible = state.centerLinesVisible;
+    });
   }
 
   function patchCustomItems(items) {
@@ -359,6 +285,7 @@
       if (item?.kind === 'ribbons') patchRibbonMesh(item.mesh);
       else if (item?.kind === 'centerlines') patchLineMesh(item.mesh);
     });
+    applyDisplaySettings(list);
   }
 
   function patchCatalogSwatches(root = document) {
@@ -373,11 +300,6 @@
       swatch.style.background = colors.bandCss;
       swatch.style.boxShadow = `0 0 0 1px ${colors.lineCss}`;
     });
-
-    const legend = document.querySelector('.gradient-chip');
-    if (legend) {
-      legend.style.background = 'linear-gradient(90deg,#b45cff,#ff7a1a,#00d9ff,#3ee58f,#ff4d9d,#ffd43b)';
-    }
   }
 
   function installCatalogMutationObserver() {
@@ -436,12 +358,20 @@
 
   function hoverIntervalMs() {
     const ribbon = (state.lastItems || []).find(item => item?.kind === 'ribbons');
-    const triangleCount = ribbon?.mesh?.geometry?.index?.count
-      ? ribbon.mesh.geometry.index.count / 3
-      : 0;
+    const triangleCount = ribbon?.mesh?.geometry?.index?.count ? ribbon.mesh.geometry.index.count / 3 : 0;
     if (triangleCount > 400000) return 180;
     if (triangleCount > 150000) return 110;
-    return 55;
+    return 50;
+  }
+
+  function setRightPanelOpen(open) {
+    const panel = document.getElementById('displayPanel');
+    const selection = document.getElementById('selectionPanel');
+    const toggle = document.getElementById('rightPanelToggle');
+    if (!panel || !selection || !toggle) return;
+    panel.classList.toggle('is-open', open);
+    selection.classList.toggle('right-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function installPointerInteractions() {
@@ -458,28 +388,23 @@
       state.lastHoverRaycastAt = now;
       const result = raycastPointer(event.clientX, event.clientY);
       if (result) {
-        renderTooltip(result.meta, event.clientX, event.clientY, false);
+        renderInfo(result.meta, false);
         canvas.style.cursor = 'pointer';
       } else {
-        hideTooltip();
+        clearInfo();
         canvas.style.cursor = '';
       }
     }, { passive: true });
 
     canvas.addEventListener('pointerleave', event => {
       if (event.pointerType === 'mouse' && !state.pinned) {
-        hideTooltip();
+        clearInfo();
         canvas.style.cursor = '';
       }
     }, { passive: true });
 
     canvas.addEventListener('pointerdown', event => {
-      state.pointerDown = {
-        x: event.clientX,
-        y: event.clientY,
-        time: performance.now(),
-        pointerType: event.pointerType
-      };
+      state.pointerDown = { x:event.clientX, y:event.clientY, time:performance.now(), pointerType:event.pointerType };
     }, { passive: true });
 
     canvas.addEventListener('pointerup', event => {
@@ -491,27 +416,68 @@
 
       const result = raycastPointer(event.clientX, event.clientY);
       if (result) {
-        state.pinned = true;
-        renderTooltip(result.meta, event.clientX, event.clientY, true);
+        renderInfo(result.meta, true);
+        if (window.matchMedia('(max-width: 980px)').matches) setRightPanelOpen(true);
       } else if (state.pinned) {
-        state.pinned = false;
-        hideTooltip();
+        clearInfo(true);
       }
     }, { passive: true });
   }
 
+  function installPanelControls() {
+    const toggle = document.getElementById('rightPanelToggle');
+    const close = document.getElementById('rightPanelClose');
+    const reset = document.getElementById('resetViewBtn');
+    const atmosphere = document.getElementById('atmosphereToggle');
+    const lines = document.getElementById('centerLinesToggle');
+    const opacity = document.getElementById('bandOpacity');
+    const opacityValue = document.getElementById('bandOpacityValue');
+    const info = document.getElementById('eclipseInfoCard');
+
+    toggle?.addEventListener('click', () => {
+      const panel = document.getElementById('displayPanel');
+      setRightPanelOpen(!panel?.classList.contains('is-open'));
+    });
+    close?.addEventListener('click', () => setRightPanelOpen(false));
+
+    reset?.addEventListener('click', () => {
+      state.globe?.pointOfView?.({ lat:18, lng:8, altitude:2.35 }, 800);
+    });
+
+    atmosphere?.addEventListener('change', () => {
+      state.globe?.showAtmosphere?.(atmosphere.checked);
+    });
+
+    lines?.addEventListener('change', () => {
+      state.centerLinesVisible = lines.checked;
+      applyDisplaySettings();
+    });
+
+    opacity?.addEventListener('input', () => {
+      const value = clamp(Number(opacity.value) / 100, 0.15, 1);
+      state.bandOpacity = value;
+      if (opacityValue) opacityValue.textContent = `${Math.round(value * 100)} %`;
+      applyDisplaySettings();
+    });
+
+    info?.addEventListener('click', event => {
+      if (!event.target.closest('.info-unpin')) return;
+      clearInfo(true);
+    });
+  }
+
   function patchBuildBadge() {
     const node = document.getElementById('layerStatus');
-    if (!node || node.__build13Observer) return;
+    if (!node || node.__build14Observer) return;
     const fix = () => {
-      if (node.textContent.includes('build 12')) {
-        node.textContent = node.textContent.replaceAll('build 12', `build ${BUILD}`);
-      }
+      const current = node.textContent;
+      const next = current.replace(/build\s+\d+/g, `build ${BUILD}`);
+      if (next !== current) node.textContent = next;
     };
     fix();
     const observer = new MutationObserver(fix);
-    observer.observe(node, { childList: true, subtree: true, characterData: true });
-    node.__build13Observer = observer;
+    observer.observe(node, { childList:true, subtree:true, characterData:true });
+    node.__build14Observer = observer;
   }
 
   function enhanceCurrentScene() {
@@ -536,6 +502,8 @@
       return result;
     };
 
+    const atmosphere = document.getElementById('atmosphereToggle');
+    if (atmosphere) instance.showAtmosphere(atmosphere.checked);
     if (state.THREE) installPointerInteractions();
     queueMicrotask(enhanceCurrentScene);
   }
@@ -562,7 +530,7 @@
     try {
       const [THREE, catalogResponse] = await Promise.all([
         import(THREE_URL),
-        fetch(CATALOG_URL, { cache: 'no-store' })
+        fetch(CATALOG_URL, { cache:'no-store' })
       ]);
       state.THREE = THREE;
       if (!catalogResponse.ok) throw new Error(`Catalogue NASA: HTTP ${catalogResponse.status}`);
@@ -575,11 +543,12 @@
       if (state.globe) installPointerInteractions();
       enhanceCurrentScene();
     } catch (error) {
-      console.warn('Améliorations de couleur/survol indisponibles :', error);
+      console.warn('Améliorations couleur/survol indisponibles :', error);
     }
   }
 
-  installStylesAndTooltip();
+  installSmallStyles();
+  installPanelControls();
   wrapGlobeFactory();
   patchBuildBadge();
   initializeDataAndThree();
