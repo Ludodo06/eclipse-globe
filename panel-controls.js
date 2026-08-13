@@ -12,6 +12,11 @@
         opacity:1 !important;
         pointer-events:auto !important;
       }
+      #regionView[hidden],
+      #eclipseView[hidden],
+      #shopWaiting[hidden] {
+        display:none !important;
+      }
     `;
     document.head.appendChild(style);
   }
