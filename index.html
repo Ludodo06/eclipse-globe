@@ -25,6 +25,9 @@
     h1 { margin:0 0 4px; font-size:20px; }
     h2 { margin:0; font-size:16px; }
     .subtitle { margin:0; color:#93a3b7; font-size:11px; line-height:1.4; }
+    .selection-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .selection-header > div { min-width:0; }
+    .mobile-panel-close { display:none; flex:0 0 auto; }
 
     details.catalog { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; border-top:1px solid rgba(255,255,255,.08); }
     details.catalog:not([open]) { flex:0 0 auto; }
@@ -107,22 +110,44 @@
     .status { margin-top:9px; padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.04); color:#8193a9; font-size:9px; }
     .credit { margin-top:7px; color:#68798e; font-size:8px; line-height:1.35; }
     .hint { position:absolute; z-index:2; left:50%; bottom:max(12px,env(safe-area-inset-bottom)); transform:translateX(-50%); padding:7px 11px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(4,8,14,.68); color:#b8c2d0; font-size:10px; white-space:nowrap; }
-    #rightPanelToggle { display:none; position:absolute; z-index:5; right:max(10px,env(safe-area-inset-right)); top:max(10px,env(safe-area-inset-top)); }
+    #rightPanelToggle { display:none !important; }
+    .mobile-panel-launchers { display:none; }
 
     @media (max-width:980px) {
-      .panel { height:calc(100% - 24px); }
-      .panel-left { width:min(420px,calc(100vw - 24px)); left:12px; top:12px; }
-      .panel-right { width:min(350px,calc(100vw - 24px)); right:12px; top:54px; height:calc(100% - 70px); transform:translateX(calc(100% + 24px)); transition:transform .2s ease; }
-      .panel-right.is-open { transform:translateX(0); }
-      #rightPanelToggle { display:block; }
-      .panel-left.right-open { opacity:.35; pointer-events:none; }
       .hint { display:none; }
+      .mobile-panel-launchers {
+        position:absolute; z-index:6; left:50%; bottom:max(14px,env(safe-area-inset-bottom)); transform:translateX(-50%);
+        display:flex; gap:8px; padding:6px; border:1px solid rgba(255,255,255,.12); border-radius:14px;
+        background:rgba(7,12,20,.88); backdrop-filter:blur(16px); box-shadow:0 10px 34px rgba(0,0,0,.35);
+      }
+      .mobile-panel-launchers button { white-space:nowrap; padding:9px 12px; font-size:11px; }
+      body.mobile-panel-active .mobile-panel-launchers { display:none; }
+      .mobile-panel-close { display:grid; }
+
+      #selectionPanel,#displayPanel {
+        z-index:7; top:max(10px,env(safe-area-inset-top)); bottom:max(10px,env(safe-area-inset-bottom));
+        height:auto !important; max-height:none; width:calc(100vw - 20px); margin:0;
+        opacity:0; visibility:hidden; pointer-events:none;
+        transition:transform .2s ease,opacity .16s ease,visibility .16s ease;
+      }
+      #selectionPanel {
+        left:10px; right:auto; transform:translateX(calc(-100% - 24px));
+      }
+      #displayPanel {
+        right:10px; left:auto; transform:translateX(calc(100% + 24px)); overflow-y:auto;
+      }
+      #selectionPanel.mobile-open,#displayPanel.mobile-open {
+        transform:translateX(0) !important; opacity:1; visibility:visible; pointer-events:auto;
+      }
+      #selectionPanel.right-open { opacity:0; pointer-events:none; }
+      #selectionPanel.mobile-open.right-open { opacity:1; pointer-events:auto; }
+      #displayPanel.is-open:not(.mobile-open) { transform:translateX(calc(100% + 24px)); opacity:0; visibility:hidden; pointer-events:none; }
+      #selectionPanel .catalog-list { -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
     }
     @media (max-width:520px) {
       .panel { border-radius:14px; }
-      .panel-left { width:calc(100vw - 20px); left:10px; top:10px; height:calc(100% - 20px); }
-      .panel-right { width:calc(100vw - 20px); right:10px; }
       .filter-row,.continent-actions { grid-template-columns:1fr; }
+      .mobile-panel-launchers { width:max-content; max-width:calc(100vw - 20px); }
     }
   </style>
 </head>
@@ -132,9 +157,14 @@
 
     <aside id="selectionPanel" class="panel panel-left">
       <div class="panel-pad">
-        <p class="panel-kicker">Sélection</p>
-        <h1>Eclipse Globe</h1>
-        <p class="subtitle">Choisis les éclipses à afficher. Recherche, tri, siècle et continent restent ici.</p>
+        <div class="selection-header">
+          <div>
+            <p class="panel-kicker">Sélection</p>
+            <h1>Eclipse Globe</h1>
+            <p class="subtitle">Choisis les éclipses à afficher. Recherche, tri, siècle et continent restent ici.</p>
+          </div>
+          <button id="selectionPanelClose" class="icon-btn mobile-panel-close" type="button" aria-label="Fermer le catalogue">×</button>
+        </div>
       </div>
       <details id="catalogPanel" class="catalog" open>
         <summary><span class="summary-text"><span>Catalogue NASA</span><small id="catalogCount">Chargement du catalogue…</small></span></summary>
@@ -189,12 +219,99 @@
       </div>
     </aside>
 
+    <div id="mobilePanelLaunchers" class="mobile-panel-launchers" aria-label="Ouvrir un panneau">
+      <button id="mobileOpenSelection" type="button">Éclipses</button>
+      <button id="mobileOpenInfo" type="button">Infos & affichage</button>
+    </div>
+
     <div class="hint">Glisser pour tourner · pincer / molette pour zoomer · survoler une bande pour les détails</div>
   </div>
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
   <script src="./enhancements.js?v=14"></script>
-  <script src="./selection-list.js?v=16"></script>
+  <script src="./selection-list.js?v=17"></script>
+  <script>
+    (() => {
+      const media = window.matchMedia('(max-width: 980px)');
+      const selection = document.getElementById('selectionPanel');
+      const info = document.getElementById('displayPanel');
+      const openSelection = document.getElementById('mobileOpenSelection');
+      const openInfo = document.getElementById('mobileOpenInfo');
+      const closeSelection = document.getElementById('selectionPanelClose');
+      const closeInfo = document.getElementById('rightPanelClose');
+      const legacyInfoToggle = document.getElementById('rightPanelToggle');
+      let active = null;
+      let internalClassChange = false;
+
+      function syncAria() {
+        if (!media.matches) {
+          selection.removeAttribute('aria-hidden');
+          info.removeAttribute('aria-hidden');
+          return;
+        }
+        selection.setAttribute('aria-hidden', active === 'selection' ? 'false' : 'true');
+        info.setAttribute('aria-hidden', active === 'info' ? 'false' : 'true');
+      }
+
+      function closeAll() {
+        internalClassChange = true;
+        selection.classList.remove('mobile-open', 'right-open');
+        info.classList.remove('mobile-open', 'is-open');
+        document.body.classList.remove('mobile-panel-active');
+        active = null;
+        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', 'false');
+        syncAria();
+        requestAnimationFrame(() => { internalClassChange = false; });
+      }
+
+      function openPanel(which) {
+        if (!media.matches) return;
+        internalClassChange = true;
+        selection.classList.remove('mobile-open', 'right-open');
+        info.classList.remove('mobile-open', 'is-open');
+        const target = which === 'selection' ? selection : info;
+        target.classList.add('mobile-open');
+        active = which;
+        document.body.classList.add('mobile-panel-active');
+        if (legacyInfoToggle) legacyInfoToggle.setAttribute('aria-expanded', which === 'info' ? 'true' : 'false');
+        syncAria();
+        requestAnimationFrame(() => {
+          internalClassChange = false;
+          (which === 'selection' ? closeSelection : closeInfo)?.focus({ preventScroll:true });
+        });
+      }
+
+      openSelection.addEventListener('click', () => openPanel('selection'));
+      openInfo.addEventListener('click', () => openPanel('info'));
+      closeSelection.addEventListener('click', closeAll);
+      closeInfo.addEventListener('click', closeAll);
+
+      const infoObserver = new MutationObserver(() => {
+        if (!media.matches || internalClassChange) return;
+        if (info.classList.contains('is-open')) {
+          if (active === null || active === 'info') openPanel('info');
+          else info.classList.remove('is-open');
+        }
+      });
+      infoObserver.observe(info, { attributes:true, attributeFilter:['class'] });
+
+      function handleViewport() {
+        if (media.matches) closeAll();
+        else {
+          internalClassChange = true;
+          selection.classList.remove('mobile-open', 'right-open');
+          info.classList.remove('mobile-open', 'is-open');
+          document.body.classList.remove('mobile-panel-active');
+          active = null;
+          syncAria();
+          requestAnimationFrame(() => { internalClassChange = false; });
+        }
+      }
+
+      media.addEventListener?.('change', handleViewport);
+      handleViewport();
+    })();
+  </script>
   <script type="module" src="./app.js?v=14"></script>
 </body>
 </html>
