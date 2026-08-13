@@ -95,7 +95,9 @@
   }
 
   function installStyles() {
-    if (document.getElementById('shoppingSelectorStyles')) return;
+    const old = document.getElementById('shoppingSelectorStyles');
+    old?.remove();
+
     const style = document.createElement('style');
     style.id = 'shoppingSelectorStyles';
     style.textContent = `
@@ -104,102 +106,111 @@
         overflow-y:auto !important;
         overflow-x:hidden !important;
         min-height:0 !important;
-        scrollbar-width:thin;
-        overscroll-behavior:contain;
       }
       #selectionPanel .panel-pad {
-        position:sticky; top:0; z-index:5;
+        position:sticky;
+        top:0;
+        z-index:5;
         background:rgba(7,12,20,.97);
         border-bottom:1px solid rgba(255,255,255,.07);
       }
-      #catalogPanel.shop-selector { display:block !important; overflow:visible !important; min-height:0 !important; padding:12px; border-top:0; }
+      #catalogPanel.shop-selector {
+        display:block !important;
+        padding:12px;
+        overflow:visible !important;
+      }
       #legacyCatalogBridge { display:none !important; }
-      .selector-home-head { display:flex; justify-content:space-between; align-items:end; gap:10px; margin-bottom:10px; }
+
+      #shopSelector #regionView,
+      #shopSelector #detailView { display:none !important; }
+      #shopSelector[data-screen="regions"] #regionView { display:block !important; }
+      #shopSelector[data-screen="detail"] #detailView { display:block !important; }
+
+      .selector-head { display:flex; justify-content:space-between; align-items:end; gap:10px; margin-bottom:10px; }
       .selector-title { margin:0; color:#eef3fa; font-size:12px; font-weight:800; }
-      .selector-meta { color:#8193a8; font-size:9px; white-space:nowrap; }
+      .selector-meta { color:#8193a8; font-size:9px; }
+
       .region-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
       .region-card {
-        aspect-ratio:1/1; min-width:0; padding:10px;
-        display:flex; flex-direction:column; justify-content:space-between;
-        background:rgba(255,255,255,.032); border:1px solid rgba(255,255,255,.11);
-        border-radius:12px; color:#eef4fb; text-align:left;
+        aspect-ratio:1/1;
+        min-width:0;
+        padding:10px;
+        display:flex;
+        flex-direction:column;
+        justify-content:space-between;
+        background:rgba(255,255,255,.032);
+        border:1px solid rgba(255,255,255,.11);
+        border-radius:12px;
+        color:#eef4fb;
+        text-align:left;
       }
       .region-card:hover { background:rgba(255,255,255,.065); border-color:rgba(255,255,255,.24); }
       .region-card svg {
-        width:100%; height:auto; max-height:100px;
-        fill:none; stroke:#fff; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round;
-        vector-effect:non-scaling-stroke;
+        width:100%;
+        max-height:100px;
+        fill:none;
+        stroke:#fff;
+        stroke-width:2.1;
+        stroke-linecap:round;
+        stroke-linejoin:round;
       }
-      .region-name { display:block; font-size:11px; font-weight:800; line-height:1.15; }
+      .region-name { display:block; font-size:11px; font-weight:800; }
       .region-count { display:block; margin-top:3px; color:#8495aa; font-size:8.7px; }
-      .selector-detail { display:grid; gap:10px; }
+
+      .detail-stack { display:grid; gap:10px; }
       .detail-top { display:flex; align-items:center; gap:8px; }
       .back-regions { flex:0 0 auto; padding:7px 9px; font-size:10px; }
       .detail-region { min-width:0; }
-      .detail-region strong { display:block; font-size:13px; color:#eef3fa; }
+      .detail-region strong { display:block; color:#eef3fa; font-size:13px; }
       .detail-region span { display:block; margin-top:2px; color:#8193a8; font-size:9px; }
+
       .century-range-card {
-        padding:10px; border:1px solid rgba(255,255,255,.09); border-radius:11px;
+        padding:10px;
+        border:1px solid rgba(255,255,255,.09);
+        border-radius:11px;
         background:rgba(255,255,255,.035);
       }
-      .century-range-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-      .century-range-head strong { font-size:10px; color:#dce5f0; }
+      .century-range-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+      .century-range-head strong { color:#dce5f0; font-size:10px; }
       .century-reset { padding:5px 8px; font-size:9px; }
-      .range-values { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+      .range-values { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:7px; }
       .range-value { padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.045); }
-      .range-value small { display:block; color:#7e91a7; font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
-      .range-value strong { display:block; margin-top:2px; color:#f0f4f9; font-size:10px; }
       .range-value:last-child { text-align:right; }
-      .dual-range { position:relative; height:30px; }
-      .dual-range-track { position:absolute; left:4px; right:4px; top:14px; height:3px; border-radius:999px; background:rgba(255,255,255,.13); }
-      .dual-range-fill { position:absolute; top:14px; height:3px; border-radius:999px; background:#e8eef7; }
-      .dual-range input[type="range"] {
-        position:absolute; inset:0; width:100%; height:30px; margin:0;
-        background:transparent; appearance:none; -webkit-appearance:none; pointer-events:none;
-      }
-      .dual-range input[type="range"]::-webkit-slider-runnable-track { height:3px; background:transparent; }
-      .dual-range input[type="range"]::-webkit-slider-thumb {
-        appearance:none; -webkit-appearance:none; width:16px; height:16px; margin-top:-6.5px;
-        border-radius:50%; border:2px solid #09111d; background:#fff; pointer-events:auto; cursor:pointer;
-      }
-      .dual-range input[type="range"]::-moz-range-track { height:3px; background:transparent; }
-      .dual-range input[type="range"]::-moz-range-thumb {
-        width:14px; height:14px; border-radius:50%; border:2px solid #09111d; background:#fff; pointer-events:auto; cursor:pointer;
-      }
+      .range-value small { display:block; color:#7e91a7; font-size:8px; }
+      .range-value strong { display:block; margin-top:2px; color:#f0f4f9; font-size:10px; }
+      .range-sliders { display:grid; gap:4px; }
+      .range-sliders input { width:100%; margin:0; }
+
       .result-toolbar {
-        position:sticky; top:68px; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:8px;
-        padding:9px 0 7px; background:rgba(7,12,20,.97);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        padding:4px 0;
       }
       .result-toolbar strong { display:block; color:#dfe7f2; font-size:10px; }
       .result-toolbar span { display:block; margin-top:2px; color:#8294a9; font-size:8.7px; }
       .select-visible { flex:0 0 auto; padding:7px 9px; font-size:9px; }
       .shop-results { display:grid; gap:6px; }
       .shop-empty { padding:14px 10px; border:1px dashed rgba(255,255,255,.12); border-radius:10px; color:#8294a9; font-size:10px; text-align:center; }
-      .shop-lock { padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:10px; color:#8193a8; font-size:10px; background:rgba(255,255,255,.025); }
+      .shop-lock { padding:12px; border:1px solid rgba(255,255,255,.08); border-radius:10px; color:#8193a8; font-size:10px; }
       .shop-selector .eclipse-option { background:rgba(255,255,255,.04); }
       .shop-selector .eclipse-option:has(input:checked) { background:rgba(255,255,255,.105); border-color:rgba(255,255,255,.2); }
       .shop-selector .eclipse-option-text small { white-space:normal; line-height:1.35; }
-      .selection-summary { margin-top:10px; padding:9px 10px; border-radius:9px; background:rgba(255,255,255,.035); color:#8294a9; font-size:9px; line-height:1.4; }
-      @media (max-width:520px) {
-        .region-card { padding:9px; }
-        .region-card svg { max-height:92px; }
-        .result-toolbar { top:66px; }
-      }
+      .selection-summary { padding:9px 10px; border-radius:9px; background:rgba(255,255,255,.035); color:#8294a9; font-size:9px; }
     `;
     document.head.appendChild(style);
   }
 
-  function removeLegacyScrollStyles() {
+  function removeLegacyScrollFix() {
     document.getElementById('selectionScrollFix')?.remove();
     document.getElementById('catalogGridScrollOverride')?.remove();
   }
 
-  function guardAgainstLegacyScrollStyles() {
-    removeLegacyScrollStyles();
-    const observer = new MutationObserver(removeLegacyScrollStyles);
+  function keepNativePanelScroll() {
+    removeLegacyScrollFix();
+    const observer = new MutationObserver(removeLegacyScrollFix);
     observer.observe(document.head, { childList:true });
-    setTimeout(removeLegacyScrollStyles, 0);
-    setTimeout(removeLegacyScrollStyles, 100);
   }
 
   function buildShell() {
@@ -210,41 +221,48 @@
     shop.id = 'catalogPanel';
     shop.className = 'shop-selector';
     shop.innerHTML = `
-      <div id="shopSelector">
+      <div id="shopSelector" data-screen="regions">
         <section id="regionView">
-          <div class="selector-home-head">
+          <div class="selector-head">
             <h3 class="selector-title">Choisir une zone</h3>
             <span id="shopCatalogCount" class="selector-meta">Chargement…</span>
           </div>
           <div id="regionGrid" class="region-grid"></div>
         </section>
 
-        <section id="eclipseView" class="selector-detail" hidden>
-          <div class="detail-top">
-            <button id="backToRegions" class="back-regions" type="button">← Continents</button>
-            <div class="detail-region"><strong id="detailRegionName"></strong><span id="detailRegionMeta"></span></div>
-          </div>
-
-          <div class="century-range-card">
-            <div class="century-range-head"><strong>Période</strong><button id="resetCenturyRange" class="century-reset" type="button">Tout</button></div>
-            <div class="range-values">
-              <div class="range-value"><small>Siècle min.</small><strong id="minCenturyLabel">—</strong></div>
-              <div class="range-value"><small>Siècle max.</small><strong id="maxCenturyLabel">—</strong></div>
+        <section id="detailView">
+          <div class="detail-stack">
+            <div class="detail-top">
+              <button id="backToRegions" class="back-regions" type="button">← Continents</button>
+              <div class="detail-region">
+                <strong id="detailRegionName"></strong>
+                <span id="detailRegionMeta"></span>
+              </div>
             </div>
-            <div class="dual-range">
-              <div class="dual-range-track"></div>
-              <div id="centuryRangeFill" class="dual-range-fill"></div>
-              <input id="minCenturyRange" type="range" min="0" max="0" value="0" step="1" aria-label="Siècle minimum" />
-              <input id="maxCenturyRange" type="range" min="0" max="0" value="0" step="1" aria-label="Siècle maximum" />
-            </div>
-          </div>
 
-          <div class="result-toolbar">
-            <div><strong>Éclipses</strong><span id="resultMeta">0 résultat</span></div>
-            <button id="selectVisibleBtn" class="select-visible" type="button">Tout sélectionner</button>
+            <div class="century-range-card">
+              <div class="century-range-head">
+                <strong>Période</strong>
+                <button id="resetCenturyRange" class="century-reset" type="button">Tout</button>
+              </div>
+              <div class="range-values">
+                <div class="range-value"><small>Siècle min.</small><strong id="minCenturyLabel">—</strong></div>
+                <div class="range-value"><small>Siècle max.</small><strong id="maxCenturyLabel">—</strong></div>
+              </div>
+              <div class="range-sliders">
+                <input id="minCenturyRange" type="range" min="0" max="0" value="0" step="1" aria-label="Siècle minimum" />
+                <input id="maxCenturyRange" type="range" min="0" max="0" value="0" step="1" aria-label="Siècle maximum" />
+              </div>
+            </div>
+
+            <div class="result-toolbar">
+              <div><strong>Éclipses</strong><span id="resultMeta">0 résultat</span></div>
+              <button id="selectVisibleBtn" class="select-visible" type="button">Tout sélectionner</button>
+            </div>
+
+            <div id="catalogListVisible" class="shop-results"></div>
+            <div id="selectionSummary" class="selection-summary"></div>
           </div>
-          <div id="catalogListVisible" class="shop-results"></div>
-          <div id="selectionSummary" class="selection-summary"></div>
         </section>
 
         <div id="shopWaiting" class="shop-lock">Préparation du catalogue NASA…</div>
@@ -270,22 +288,31 @@
     document.body.appendChild(bridge);
   }
 
+  function setScreen(screen) {
+    const shop = document.getElementById('shopSelector');
+    if (shop) shop.dataset.screen = screen;
+    document.getElementById('selectionPanel')?.scrollTo?.({ top:0, behavior:'auto' });
+  }
+
   function regionItems() {
     return [{ key:'Monde', label:'Monde' }, ...CONTINENTS.map(name => ({ key:name, label:name }))];
   }
 
   function regionCatalog(region = state.region) {
     if (!region || region === 'Monde') return state.catalog;
-    return state.catalog.filter(e => e.continent === region);
+    return state.catalog.filter(eclipse => eclipse.continent === region);
   }
 
   function regionCount(region) {
-    return region === 'Monde' ? state.catalog.length : state.catalog.filter(e => e.continent === region).length;
+    return region === 'Monde'
+      ? state.catalog.length
+      : state.catalog.filter(eclipse => eclipse.continent === region).length;
   }
 
   function renderRegions() {
     const grid = document.getElementById('regionGrid');
     if (!grid || !state.ready) return;
+
     const fragment = document.createDocumentFragment();
     regionItems().forEach(region => {
       const button = document.createElement('button');
@@ -294,7 +321,10 @@
       button.dataset.region = region.key;
       button.innerHTML = `
         <svg viewBox="0 0 160 100" aria-hidden="true">${REGION_ICONS[region.key]}</svg>
-        <span><span class="region-name">${region.label}</span><span class="region-count">${regionCount(region.key).toLocaleString('fr-FR')} éclipses</span></span>
+        <span>
+          <span class="region-name">${region.label}</span>
+          <span class="region-count">${regionCount(region.key).toLocaleString('fr-FR')} éclipses</span>
+        </span>
       `;
       fragment.appendChild(button);
     });
@@ -303,11 +333,16 @@
 
   function availableCenturies() {
     const groups = new Map();
-    regionCatalog().forEach(e => {
-      if (!groups.has(e.centuryKey)) groups.set(e.centuryKey, { key:e.centuryKey, label:e.centuryLabel, count:0, first:e });
-      groups.get(e.centuryKey).count += 1;
+    regionCatalog().forEach(eclipse => {
+      if (!groups.has(eclipse.centuryKey)) {
+        groups.set(eclipse.centuryKey, {
+          key:eclipse.centuryKey,
+          label:eclipse.centuryLabel,
+          first:eclipse
+        });
+      }
     });
-    return [...groups.values()].sort((a,b) => chronological(a.first,b.first));
+    return [...groups.values()].sort((a, b) => chronological(a.first, b.first));
   }
 
   function resetCenturyRange() {
@@ -316,24 +351,22 @@
     state.maxCenturyIndex = Math.max(0, state.centuries.length - 1);
   }
 
-  function currentCenturyKeys() {
-    if (!state.centuries.length) return new Set();
-    return new Set(
+  function scopedCatalog() {
+    if (!state.region || !state.centuries.length) return [];
+    const keys = new Set(
       state.centuries
         .slice(state.minCenturyIndex, state.maxCenturyIndex + 1)
         .map(century => century.key)
     );
-  }
-
-  function scopedCatalog() {
-    const allowed = currentCenturyKeys();
     return regionCatalog()
-      .filter(e => allowed.has(e.centuryKey))
+      .filter(eclipse => keys.has(eclipse.centuryKey))
       .slice()
       .sort(chronological);
   }
 
   function colorFor(eclipse) {
+    if (eclipse.nasaId === '20260812') return '#b45cff';
+    if (eclipse.nasaId === '20270802') return '#ff7a1a';
     const n = Number(eclipse.catalogNumber) || 1;
     const hue = (n * 137.50776405) % 360;
     return `hsl(${hue.toFixed(1)} 92% 62%)`;
@@ -356,61 +389,50 @@
     const text = document.createElement('span');
     text.className = 'eclipse-option-text';
     text.innerHTML = `<strong>${eclipse.displayDate}</strong><small>Saros ${eclipse.saros} · ${eclipse.maxPathWidthKm ?? '—'} km · ${eclipse.maxDuration ?? 'durée n/d'}</small>`;
+
     label.append(input, swatch, text);
     return label;
   }
 
-  function updateRangeUi() {
-    const minInput = document.getElementById('minCenturyRange');
-    const maxInput = document.getElementById('maxCenturyRange');
+  function renderRange() {
+    const min = document.getElementById('minCenturyRange');
+    const max = document.getElementById('maxCenturyRange');
     const minLabel = document.getElementById('minCenturyLabel');
     const maxLabel = document.getElementById('maxCenturyLabel');
-    const fill = document.getElementById('centuryRangeFill');
-    const maxIndex = Math.max(0, state.centuries.length - 1);
-    if (!minInput || !maxInput || !minLabel || !maxLabel || !fill) return;
+    if (!min || !max || !minLabel || !maxLabel) return;
 
-    minInput.max = String(maxIndex);
-    maxInput.max = String(maxIndex);
-    minInput.value = String(state.minCenturyIndex);
-    maxInput.value = String(state.maxCenturyIndex);
-    minInput.disabled = maxIndex === 0;
-    maxInput.disabled = maxIndex === 0;
-
+    const last = Math.max(0, state.centuries.length - 1);
+    min.max = String(last);
+    max.max = String(last);
+    min.value = String(state.minCenturyIndex);
+    max.value = String(state.maxCenturyIndex);
+    min.disabled = last === 0;
+    max.disabled = last === 0;
     minLabel.textContent = state.centuries[state.minCenturyIndex]?.label || '—';
     maxLabel.textContent = state.centuries[state.maxCenturyIndex]?.label || '—';
-
-    const left = maxIndex ? (state.minCenturyIndex / maxIndex) * 100 : 0;
-    const right = maxIndex ? (state.maxCenturyIndex / maxIndex) * 100 : 100;
-    fill.style.left = `${left}%`;
-    fill.style.width = `${Math.max(0, right - left)}%`;
   }
 
   function renderDetail() {
-    const regionView = document.getElementById('regionView');
-    const eclipseView = document.getElementById('eclipseView');
-    const waiting = document.getElementById('shopWaiting');
+    if (!state.region) return;
+
     const regionName = document.getElementById('detailRegionName');
     const regionMeta = document.getElementById('detailRegionMeta');
     const list = document.getElementById('catalogListVisible');
     const resultMeta = document.getElementById('resultMeta');
     const selectVisible = document.getElementById('selectVisibleBtn');
     const summary = document.getElementById('selectionSummary');
-    if (!regionView || !eclipseView || !waiting || !regionName || !regionMeta || !list || !resultMeta || !selectVisible || !summary) return;
-
-    waiting.hidden = state.ready && state.appReady;
-    regionView.hidden = Boolean(state.region);
-    eclipseView.hidden = !state.region;
-    if (!state.region) return;
+    if (!regionName || !regionMeta || !list || !resultMeta || !selectVisible || !summary) return;
 
     regionName.textContent = state.region;
     regionMeta.textContent = `${regionCatalog().length.toLocaleString('fr-FR')} éclipses dans le catalogue`;
-    updateRangeUi();
+    renderRange();
 
     const result = scopedCatalog();
     resultMeta.textContent = `${result.length.toLocaleString('fr-FR')} résultat${result.length > 1 ? 's' : ''}`;
-    const allSelected = result.length > 0 && result.every(e => state.selectedIds.has(e.id));
+
+    const allSelected = result.length > 0 && result.every(eclipse => state.selectedIds.has(eclipse.id));
     selectVisible.textContent = allSelected ? 'Tout désélectionner' : 'Tout sélectionner';
-    selectVisible.disabled = !state.appReady || result.length === 0;
+    selectVisible.disabled = !state.appReady || !result.length;
 
     if (!result.length) {
       list.innerHTML = '<div class="shop-empty">Aucune éclipse dans cette période.</div>';
@@ -427,6 +449,7 @@
     if (!state.ready) return;
     const count = document.getElementById('shopCatalogCount');
     if (count) count.textContent = `${state.catalog.length.toLocaleString('fr-FR')} totales`;
+    document.getElementById('shopWaiting').style.display = state.appReady ? 'none' : 'block';
     renderRegions();
     renderDetail();
   }
@@ -434,6 +457,7 @@
   function bridgeSelection(id, checked) {
     const legacyList = document.getElementById('catalogList');
     if (!legacyList) return;
+
     let input = legacyList.querySelector(`input[data-eclipse-id="${CSS.escape(id)}"]`);
     let temporary = false;
     if (!input) {
@@ -445,42 +469,45 @@
       legacyList.appendChild(input);
       temporary = true;
     }
+
     input.checked = checked;
     input.dispatchEvent(new Event('change', { bubbles:true }));
     if (temporary) input.remove();
   }
 
-  function setSelectedIds(ids, checked) {
-    const result = ids.filter(Boolean);
+  function setVisibleSelection(checked) {
+    const result = scopedCatalog();
     if (!result.length) return;
 
-    if (checked && state.region === 'Monde' && state.minCenturyIndex === 0 && state.maxCenturyIndex === state.centuries.length - 1) {
+    const fullRange = state.minCenturyIndex === 0 && state.maxCenturyIndex === state.centuries.length - 1;
+
+    if (checked && state.region === 'Monde' && fullRange) {
       document.getElementById('showAllBtn')?.click();
-      state.selectedIds = new Set(state.catalog.map(e => e.id));
+      state.selectedIds = new Set(state.catalog.map(eclipse => eclipse.id));
       renderDetail();
       return;
     }
 
-    if (checked && state.region !== 'Monde' && state.minCenturyIndex === 0 && state.maxCenturyIndex === state.centuries.length - 1) {
-      const continentSelect = document.getElementById('continentSelect');
-      if (continentSelect) continentSelect.value = state.region;
+    if (checked && state.region !== 'Monde' && fullRange) {
+      const continent = document.getElementById('continentSelect');
+      if (continent) continent.value = state.region;
       document.getElementById('showContinentBtn')?.click();
-      state.selectedIds = new Set(regionCatalog().map(e => e.id));
+      state.selectedIds = new Set(regionCatalog().map(eclipse => eclipse.id));
       renderDetail();
       return;
     }
 
-    if (!checked && result.every(id => state.selectedIds.has(id)) && result.length === state.selectedIds.size) {
+    if (!checked && result.length === state.selectedIds.size && result.every(eclipse => state.selectedIds.has(eclipse.id))) {
       document.getElementById('clearAllBtn')?.click();
       state.selectedIds.clear();
       renderDetail();
       return;
     }
 
-    result.forEach(id => {
-      if (checked) state.selectedIds.add(id);
-      else state.selectedIds.delete(id);
-      bridgeSelection(id, checked);
+    result.forEach(eclipse => {
+      if (checked) state.selectedIds.add(eclipse.id);
+      else state.selectedIds.delete(eclipse.id);
+      bridgeSelection(eclipse.id, checked);
     });
     renderDetail();
   }
@@ -488,24 +515,20 @@
   function enterRegion(region) {
     state.region = region;
     resetCenturyRange();
-    renderAll();
-    document.getElementById('selectionPanel')?.scrollTo?.({ top:0, behavior:'auto' });
+    renderDetail();
+    setScreen('detail');
   }
 
   function leaveRegion() {
     state.region = null;
     state.centuries = [];
-    renderAll();
-    document.getElementById('selectionPanel')?.scrollTo?.({ top:0, behavior:'auto' });
+    setScreen('regions');
   }
 
   function installInteractions() {
     document.addEventListener('click', event => {
-      const shop = document.getElementById('shopSelector');
-      if (!shop) return;
-
       const region = event.target.closest?.('.region-card[data-region]');
-      if (region && shop.contains(region)) {
+      if (region && document.getElementById('regionGrid')?.contains(region)) {
         enterRegion(region.dataset.region);
         return;
       }
@@ -523,21 +546,20 @@
 
       if (event.target.closest?.('#selectVisibleBtn')) {
         const result = scopedCatalog();
-        const allSelected = result.length > 0 && result.every(e => state.selectedIds.has(e.id));
-        setSelectedIds(result.map(e => e.id), !allSelected);
+        const allSelected = result.length > 0 && result.every(eclipse => state.selectedIds.has(eclipse.id));
+        setVisibleSelection(!allSelected);
       }
     });
 
     document.addEventListener('input', event => {
       if (event.target?.id === 'minCenturyRange') {
-        const value = Number(event.target.value);
-        state.minCenturyIndex = Math.min(value, state.maxCenturyIndex);
+        state.minCenturyIndex = Math.min(Number(event.target.value), state.maxCenturyIndex);
         renderDetail();
         return;
       }
+
       if (event.target?.id === 'maxCenturyRange') {
-        const value = Number(event.target.value);
-        state.maxCenturyIndex = Math.max(value, state.minCenturyIndex);
+        state.maxCenturyIndex = Math.max(Number(event.target.value), state.minCenturyIndex);
         renderDetail();
       }
     });
@@ -545,6 +567,7 @@
     document.addEventListener('change', event => {
       const input = event.target.closest?.('input[data-shop-eclipse-id]');
       if (!input) return;
+
       const id = input.dataset.shopEclipseId;
       if (input.checked) state.selectedIds.add(id);
       else state.selectedIds.delete(id);
@@ -556,18 +579,22 @@
   function detectAppReady() {
     const legacyCount = document.getElementById('catalogCount');
     if (!legacyCount) return;
+
     const check = () => {
-      if (/3[\s\u202f]?173/.test(legacyCount.textContent || '')) {
-        state.appReady = true;
-        const defaultEclipse = state.catalog.find(e => e.nasaId === '20270802') || state.catalog.find(e => e.nasaId === '20260812');
-        if (defaultEclipse && !state.selectedIds.size) state.selectedIds.add(defaultEclipse.id);
-        renderAll();
-        return true;
-      }
-      return false;
+      if (!/3[\s\u202f]?173/.test(legacyCount.textContent || '')) return false;
+
+      state.appReady = true;
+      const defaultEclipse = state.catalog.find(eclipse => eclipse.nasaId === '20270802')
+        || state.catalog.find(eclipse => eclipse.nasaId === '20260812');
+      if (defaultEclipse && !state.selectedIds.size) state.selectedIds.add(defaultEclipse.id);
+      renderAll();
+      return true;
     };
+
     if (check()) return;
-    const observer = new MutationObserver(() => { if (check()) observer.disconnect(); });
+    const observer = new MutationObserver(() => {
+      if (check()) observer.disconnect();
+    });
     observer.observe(legacyCount, { childList:true, subtree:true, characterData:true });
   }
 
@@ -576,22 +603,29 @@
       const response = await fetch(CATALOG_URL, { cache:'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      state.catalog = (data.eclipses || []).map(e => {
-        const century = centuryInfo(Number(e.year));
-        return { ...e, displayDate:formatDate(e), centuryKey:century.key, centuryLabel:century.label };
+
+      state.catalog = (data.eclipses || []).map(eclipse => {
+        const century = centuryInfo(Number(eclipse.year));
+        return {
+          ...eclipse,
+          displayDate:formatDate(eclipse),
+          centuryKey:century.key,
+          centuryLabel:century.label
+        };
       }).sort(chronological);
+
       state.ready = true;
       renderAll();
       detectAppReady();
     } catch (error) {
-      console.warn('Nouveau sélecteur indisponible :', error);
+      console.warn('Sélecteur indisponible :', error);
       const waiting = document.getElementById('shopWaiting');
       if (waiting) waiting.textContent = 'Impossible de charger le catalogue NASA.';
     }
   }
 
   installStyles();
-  guardAgainstLegacyScrollStyles();
+  keepNativePanelScroll();
   buildShell();
   installInteractions();
   loadCatalog();
