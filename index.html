@@ -62,17 +62,17 @@
     .eclipse-option-text small {
       display:block; margin-top:2px; color:#90a0b4; font-size:9.5px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    .continent-group { border:1px solid rgba(255,255,255,.08); border-radius:9px; overflow:hidden; }
-    .continent-group + .continent-group { margin-top:6px; }
-    .continent-group > summary {
+    .catalog-group { border:1px solid rgba(255,255,255,.08); border-radius:9px; overflow:hidden; }
+    .catalog-group + .catalog-group { margin-top:6px; }
+    .catalog-group > summary {
       cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:8px;
       padding:9px 10px; color:#dce5f1; font-size:11px; font-weight:700; background:rgba(255,255,255,.035);
     }
-    .continent-group > summary::-webkit-details-marker { display:none; }
-    .continent-group > summary small { color:#8291a5; font-size:9.5px; font-weight:500; }
-    .continent-body { padding:7px; }
-    .continent-show-btn { width:100%; margin-bottom:7px; font-size:10px; padding:7px 8px; }
-    .continent-rows { display:grid; gap:6px; }
+    .catalog-group > summary::-webkit-details-marker { display:none; }
+    .catalog-group > summary small { color:#8291a5; font-size:9.5px; font-weight:500; }
+    .group-body { padding:7px; }
+    .group-show-btn { width:100%; margin-bottom:7px; font-size:10px; padding:7px 8px; }
+    .group-rows { display:grid; gap:6px; }
     #loadMoreBtn { width:100%; margin-top:8px; padding:8px; font-size:10px; }
     .catalog-hint { color:#7f90a5; font-size:9.5px; line-height:1.4; margin:8px 2px 0; }
     .main-actions { display:grid; grid-template-columns:1fr; gap:8px; margin-top:10px; }
@@ -125,10 +125,11 @@
           <div class="catalog-toolbar">
             <select id="catalogMode" aria-label="Mode d’affichage du catalogue">
               <option value="chrono">Ordre chronologique</option>
+              <option value="century">Par siècle</option>
               <option value="continent">Par continent</option>
             </select>
 
-            <input id="catalogSearch" type="search" placeholder="Rechercher une année, un Saros, un continent…" />
+            <input id="catalogSearch" type="search" placeholder="Rechercher une année, un siècle, un Saros, un continent…" />
 
             <div class="bulk-actions">
               <button id="showAllBtn" type="button">Tout afficher</button>
@@ -165,14 +166,14 @@
         <span class="legend-chip"><i class="line-white"></i>frontières</span>
       </div>
 
-      <div id="layerStatus" class="status">catalogue … · frontières … · build 11</div>
-      <div class="credit">Catalogue : NASA GSFC, Fred Espenak &amp; Jean Meeus. Le regroupement par continent utilise le continent principal le plus proche du point de maximum. Les trajectoires détaillées sont chargées à la demande.</div>
+      <div id="layerStatus" class="status">catalogue … · frontières … · build 12</div>
+      <div class="credit">Catalogue : NASA GSFC, Fred Espenak &amp; Jean Meeus. Regroupement par continent : continent principal le plus proche du point de maximum. Les bandes détaillées n’ont plus de limite de sélection et utilisent un niveau de détail adaptatif.</div>
     </section>
 
     <div class="hint">Glisser pour tourner · pincer / molette pour zoomer</div>
   </div>
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
-  <script type="module" src="./app.js?v=11"></script>
+  <script type="module" src="./app.js?v=12"></script>
 </body>
 </html>
