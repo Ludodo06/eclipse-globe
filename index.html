@@ -10,76 +10,65 @@
     * { box-sizing:border-box; }
     html,body,#app { width:100%; height:100%; margin:0; overflow:hidden; background:#02050a; }
     #globe { position:absolute; inset:0; }
-
-    .panel {
-      position:absolute; z-index:3; top:max(14px,env(safe-area-inset-top));
-      max-height:calc(100% - 28px); overflow:hidden;
-      border:1px solid rgba(255,255,255,.13); border-radius:16px;
-      background:rgba(7,12,20,.90); backdrop-filter:blur(18px);
-      box-shadow:0 18px 64px rgba(0,0,0,.38);
-    }
-    .panel-left { left:max(14px,env(safe-area-inset-left)); width:min(440px,calc(50vw - 26px)); display:flex; flex-direction:column; }
-    .panel-right { right:max(14px,env(safe-area-inset-right)); width:min(360px,calc(43vw - 26px)); overflow-y:auto; scrollbar-width:thin; }
-    .panel-pad { padding:14px; }
-
-    .brand-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
-    .brand-row h1 { margin:0 0 3px; font-size:20px; line-height:1.1; }
-    .brand-row p { margin:0; color:#93a3b7; font-size:11px; line-height:1.4; }
-    .panel-kicker { margin:0 0 3px!important; color:#7e91a8!important; font-size:9px!important; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-
-    button,select,input[type="search"],input[type="range"] { font:inherit; }
-    button,select,input[type="search"] { border:1px solid rgba(255,255,255,.14); background:#111b2a; color:#f4f7fb; padding:9px 10px; border-radius:9px; }
+    button,select,input { font:inherit; }
+    button,select,input[type="search"] { border:1px solid rgba(255,255,255,.14); background:#111b2a; color:#f4f7fb; border-radius:9px; padding:9px 10px; }
     button { cursor:pointer; font-weight:680; }
     button:hover { background:#17253a; }
     button:disabled { opacity:.45; cursor:not-allowed; }
-    input[type="search"] { width:100%; min-width:0; outline:none; }
-    select { width:100%; min-width:0; }
+    select,input[type="search"] { width:100%; min-width:0; }
 
-    details.catalog { display:flex; flex-direction:column; min-height:0; flex:1; border-top:1px solid rgba(255,255,255,.08); }
-    details.catalog > summary { list-style:none; cursor:pointer; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:11px; font-weight:760; background:rgba(255,255,255,.025); }
+    .panel { position:absolute; z-index:3; top:max(14px,env(safe-area-inset-top)); height:calc(100% - 28px); min-height:0; border:1px solid rgba(255,255,255,.13); border-radius:16px; background:rgba(7,12,20,.90); backdrop-filter:blur(18px); box-shadow:0 18px 64px rgba(0,0,0,.38); }
+    .panel-left { left:max(14px,env(safe-area-inset-left)); width:min(440px,calc(50vw - 26px)); display:flex; flex-direction:column; overflow:hidden; }
+    .panel-right { right:max(14px,env(safe-area-inset-right)); width:min(350px,calc(42vw - 26px)); overflow-y:auto; scrollbar-width:thin; }
+    .panel-pad { padding:14px; }
+    .panel-kicker { margin:0 0 3px; color:#7e91a8; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+    h1 { margin:0 0 4px; font-size:20px; }
+    h2 { margin:0; font-size:16px; }
+    .subtitle { margin:0; color:#93a3b7; font-size:11px; line-height:1.4; }
+
+    details.catalog { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; border-top:1px solid rgba(255,255,255,.08); }
+    details.catalog:not([open]) { flex:0 0 auto; }
+    details.catalog > summary { flex:0 0 auto; list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; font-size:11px; font-weight:760; background:rgba(255,255,255,.025); }
     details.catalog > summary::-webkit-details-marker { display:none; }
-    details.catalog > summary::after { content:"▾"; color:#8fa0b5; transition:transform .18s ease; }
+    details.catalog > summary::after { content:"▾"; color:#8fa0b5; }
     details.catalog:not([open]) > summary::after { transform:rotate(-90deg); }
-    .summary-text { min-width:0; display:flex; flex-direction:column; gap:2px; }
+    .summary-text { display:flex; flex-direction:column; gap:2px; }
     .summary-text small { color:#7f91a7; font-size:9.5px; font-weight:500; }
-    .catalog-body { display:flex; flex-direction:column; min-height:0; flex:1; padding:0 10px 10px; }
-    .catalog-toolbar { position:sticky; top:0; z-index:2; display:grid; grid-template-columns:1fr; gap:7px; padding:10px 0 8px; background:linear-gradient(rgba(7,12,20,.99) 78%,rgba(7,12,20,0)); }
+    .catalog-body { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; overflow:hidden; padding:0 10px 10px; }
+    .catalog-toolbar { flex:0 0 auto; display:grid; gap:7px; padding:10px 0 8px; }
     .filter-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.45fr); gap:7px; }
     .bulk-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
-    .bulk-actions button { width:100%; }
     .continent-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
-    .continent-actions button { white-space:nowrap; }
-    .catalog-list { display:grid; gap:6px; min-height:0; flex:1; overflow:auto; padding:1px 2px 2px 0; scrollbar-width:thin; }
+    .catalog-list { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-gutter:stable; display:grid; align-content:start; gap:6px; padding-right:2px; }
+    .catalog-hint { flex:0 0 auto; margin:7px 2px 0; color:#788ba2; font-size:9px; line-height:1.4; }
+    #loadMoreBtn { flex:0 0 auto; width:100%; margin-top:7px; }
+
     .eclipse-option { display:grid; grid-template-columns:20px 11px minmax(0,1fr); gap:9px; align-items:center; padding:8px 9px; border:1px solid transparent; border-radius:9px; background:rgba(255,255,255,.048); cursor:pointer; }
-    .eclipse-option:hover { background:rgba(255,255,255,.078); border-color:rgba(255,255,255,.07); }
+    .eclipse-option:hover { background:rgba(255,255,255,.078); }
     .eclipse-option:has(input:checked) { background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.13); }
     .eclipse-option input { width:18px; height:18px; margin:0; accent-color:#fff; }
     .eclipse-swatch { width:10px; height:10px; border-radius:50%; }
     .eclipse-option-text { min-width:0; }
-    .eclipse-option-text strong { display:block; font-size:11px; color:#eef3fa; }
-    .eclipse-option-text small { display:block; margin-top:2px; color:#8fa0b4; font-size:9px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .eclipse-option-text strong { display:block; color:#eef3fa; font-size:11px; }
+    .eclipse-option-text small { display:block; margin-top:2px; color:#8fa0b4; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .catalog-group { border:1px solid rgba(255,255,255,.08); border-radius:9px; overflow:hidden; }
-    .catalog-group + .catalog-group { margin-top:6px; }
-    .catalog-group > summary { cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 10px; color:#dce5f1; font-size:11px; font-weight:700; background:rgba(255,255,255,.035); }
+    .catalog-group > summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; gap:8px; padding:9px 10px; background:rgba(255,255,255,.035); color:#dce5f1; font-size:11px; font-weight:700; }
     .catalog-group > summary::-webkit-details-marker { display:none; }
-    .catalog-group > summary small { color:#8291a5; font-size:9.5px; font-weight:500; }
+    .catalog-group > summary small { color:#8291a5; font-size:9px; font-weight:500; }
     .group-body { padding:7px; }
-    .group-show-btn { width:100%; margin-bottom:7px; font-size:10px; padding:7px 8px; }
+    .group-show-btn { width:100%; margin-bottom:7px; font-size:10px; padding:7px; }
     .group-rows { display:grid; gap:6px; }
-    #loadMoreBtn { width:100%; margin-top:8px; padding:8px; font-size:10px; }
-    .catalog-hint { color:#788ba2; font-size:9px; line-height:1.4; margin:7px 2px 0; }
 
     .right-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-    .right-header h2 { margin:0; font-size:16px; }
-    .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; font-size:16px; }
-    .info-card,.settings-card,.stats-card,.visible-card { border:1px solid rgba(255,255,255,.09); border-radius:11px; background:rgba(255,255,255,.04); }
-    .info-card { padding:11px; min-height:180px; }
+    .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; }
+    .info-card,.visible-card,.settings-card,.stats-card { border:1px solid rgba(255,255,255,.09); border-radius:11px; background:rgba(255,255,255,.04); }
+    .info-card { padding:11px; min-height:170px; }
     .info-empty { color:#8fa0b5; font-size:11px; line-height:1.5; }
-    .info-empty strong { display:block; color:#dfe8f4; margin-bottom:4px; font-size:12px; }
+    .info-empty strong { display:block; color:#dfe8f4; margin-bottom:4px; }
     .info-head { display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:8px; align-items:center; }
-    .info-dot { width:11px; height:11px; border-radius:50%; box-shadow:0 0 0 1px rgba(255,255,255,.45); }
+    .info-dot { width:11px; height:11px; border-radius:50%; }
     .info-title { font-size:13px; font-weight:800; }
-    .info-mode { color:#8294aa; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .info-mode { color:#8294aa; font-size:9px; font-weight:700; text-transform:uppercase; }
     .info-sub { margin:5px 0 9px 20px; color:#8d9eb2; font-size:9.5px; }
     .info-table { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 10px; margin:0; }
     .info-table dt { color:#7f91a7; font-size:10px; }
@@ -87,59 +76,53 @@
     .info-foot { margin-top:8px; padding-top:7px; border-top:1px solid rgba(255,255,255,.08); color:#718298; font-size:8.5px; }
 
     .visible-card { margin-top:9px; overflow:hidden; }
-    .visible-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 11px 8px; border-bottom:1px solid rgba(255,255,255,.07); }
-    .visible-head strong { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#cbd5e2; }
-    .visible-head span { font-size:9px; color:#8294aa; }
-    .visible-list { display:grid; gap:4px; max-height:260px; overflow:auto; padding:7px; scrollbar-width:thin; }
-    .visible-empty { padding:9px; color:#8193a9; font-size:10px; line-height:1.4; }
-    .visible-eclipse-btn { display:grid; grid-template-columns:9px minmax(0,1fr) auto; align-items:center; gap:8px; width:100%; padding:7px 8px; text-align:left; border-color:transparent; background:rgba(255,255,255,.035); }
-    .visible-eclipse-btn:hover { border-color:rgba(255,255,255,.10); background:rgba(255,255,255,.075); }
-    .visible-eclipse-btn.is-focused { border-color:rgba(255,255,255,.28); background:rgba(255,255,255,.10); }
+    .visible-head { display:flex; justify-content:space-between; align-items:center; padding:9px 10px; border-bottom:1px solid rgba(255,255,255,.07); color:#cbd5e2; font-size:10px; }
+    .visible-head span { color:#8294aa; }
+    .visible-list { max-height:220px; overflow-y:auto; scrollbar-width:thin; padding:6px; display:grid; gap:5px; }
+    .visible-empty { padding:8px; color:#8192a7; font-size:9.5px; }
+    .visible-eclipse-btn { width:100%; display:grid; grid-template-columns:9px minmax(0,1fr) auto; gap:7px; align-items:center; padding:7px 8px; text-align:left; background:rgba(255,255,255,.035); font-size:9.5px; }
+    .visible-eclipse-btn.is-focused { border-color:rgba(255,255,255,.35); background:rgba(255,255,255,.09); }
     .visible-dot { width:8px; height:8px; border-radius:50%; }
-    .visible-date { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; font-weight:750; color:#edf3fb; }
-    .visible-meta { font-size:8.5px; color:#8192a7; white-space:nowrap; }
+    .visible-date { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .visible-meta { color:#8294aa; font-size:8.5px; }
 
     .settings-card { margin-top:9px; padding:10px; }
     .settings-title { margin:0 0 8px; color:#cbd5e2; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
     .action-grid button { padding:8px; font-size:10px; }
     .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:7px; padding:8px 9px; border-radius:8px; background:rgba(255,255,255,.045); }
-    .toggle-row label { margin:0; color:#cbd5e2; font-size:10px; font-weight:650; }
-    .toggle-row input[type="checkbox"] { width:18px; height:18px; accent-color:#fff; flex:0 0 auto; }
+    .toggle-row label { color:#cbd5e2; font-size:10px; font-weight:650; }
+    .toggle-row input { width:18px; height:18px; accent-color:#fff; }
     .range-row { margin-top:8px; padding:8px 9px; border-radius:8px; background:rgba(255,255,255,.045); }
-    .range-label { display:flex; justify-content:space-between; gap:10px; color:#cbd5e2; font-size:10px; font-weight:650; }
-    .range-row input[type="range"] { width:100%; margin:8px 0 0; accent-color:#fff; }
+    .range-label { display:flex; justify-content:space-between; color:#cbd5e2; font-size:10px; font-weight:650; }
+    .range-row input { width:100%; margin-top:8px; accent-color:#fff; }
     .stats-card { display:grid; grid-template-columns:1fr 1fr; gap:1px; margin-top:9px; overflow:hidden; }
     .stat { padding:10px; background:rgba(255,255,255,.025); }
     .stat strong { display:block; font-size:14px; }
     .stat span { display:block; margin-top:2px; color:#91a0b3; font-size:9px; }
-    .legend { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:9px; color:#9babbc; font-size:9px; }
+    .legend { display:flex; gap:12px; flex-wrap:wrap; margin-top:9px; color:#9babbc; font-size:9px; }
     .legend-chip { display:inline-flex; align-items:center; gap:5px; }
-    .gradient-chip { width:23px; height:7px; border-radius:999px; background:linear-gradient(90deg,#b45cff,#ff7a1a,#00d9ff,#3ee58f,#ff4d9d,#ffd43b); display:inline-block; }
-    .line-white { width:13px; height:0; display:inline-block; border-top:1px solid rgba(255,255,255,.9); }
-    .status { margin-top:9px; padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.04); color:#8193a9; font-size:9px; line-height:1.35; }
+    .gradient-chip { width:23px; height:7px; border-radius:999px; background:linear-gradient(90deg,#b45cff,#ff7a1a,#00d9ff,#3ee58f,#ff4d9d,#ffd43b); }
+    .line-white { width:13px; border-top:1px solid rgba(255,255,255,.9); }
+    .status { margin-top:9px; padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.04); color:#8193a9; font-size:9px; }
     .credit { margin-top:7px; color:#68798e; font-size:8px; line-height:1.35; }
-
-    .hint { position:absolute; z-index:2; bottom:max(12px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:#b8c2d0; font-size:10px; background:rgba(4,8,14,.68); border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:7px 11px; backdrop-filter:blur(10px); white-space:nowrap; }
-    #rightPanelToggle { display:none; position:absolute; z-index:5; right:max(10px,env(safe-area-inset-right)); top:max(10px,env(safe-area-inset-top)); width:auto; padding:8px 10px; font-size:10px; }
+    .hint { position:absolute; z-index:2; left:50%; bottom:max(12px,env(safe-area-inset-bottom)); transform:translateX(-50%); padding:7px 11px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(4,8,14,.68); color:#b8c2d0; font-size:10px; white-space:nowrap; }
+    #rightPanelToggle { display:none; position:absolute; z-index:5; right:max(10px,env(safe-area-inset-right)); top:max(10px,env(safe-area-inset-top)); }
 
     @media (max-width:980px) {
-      .panel-left { width:min(420px,calc(100vw - 24px)); left:max(12px,env(safe-area-inset-left)); top:max(12px,env(safe-area-inset-top)); max-height:calc(100% - 24px); }
-      .panel-right { width:min(360px,calc(100vw - 24px)); right:max(12px,env(safe-area-inset-right)); top:max(54px,calc(env(safe-area-inset-top) + 44px)); max-height:calc(100% - 70px); transform:translateX(calc(100% + 24px)); transition:transform .2s ease; }
+      .panel { height:calc(100% - 24px); }
+      .panel-left { width:min(420px,calc(100vw - 24px)); left:12px; top:12px; }
+      .panel-right { width:min(350px,calc(100vw - 24px)); right:12px; top:54px; height:calc(100% - 70px); transform:translateX(calc(100% + 24px)); transition:transform .2s ease; }
       .panel-right.is-open { transform:translateX(0); }
       #rightPanelToggle { display:block; }
       .panel-left.right-open { opacity:.35; pointer-events:none; }
-      .catalog-list { max-height:none; }
       .hint { display:none; }
     }
     @media (max-width:520px) {
       .panel { border-radius:14px; }
-      .panel-left { width:calc(100vw - 20px); left:10px; top:max(10px,env(safe-area-inset-top)); max-height:calc(100% - 20px); }
+      .panel-left { width:calc(100vw - 20px); left:10px; top:10px; height:calc(100% - 20px); }
       .panel-right { width:calc(100vw - 20px); right:10px; }
-      .panel-pad { padding:12px; }
       .filter-row,.continent-actions { grid-template-columns:1fr; }
-      .brand-row h1 { font-size:18px; }
-      .visible-list { max-height:220px; }
     }
   </style>
 </head>
@@ -149,19 +132,12 @@
 
     <aside id="selectionPanel" class="panel panel-left">
       <div class="panel-pad">
-        <div class="brand-row">
-          <div>
-            <p class="panel-kicker">Sélection</p>
-            <h1>Eclipse Globe</h1>
-            <p class="subtitle">Choisis les éclipses à afficher. Recherche, tri, siècle et continent restent ici.</p>
-          </div>
-        </div>
+        <p class="panel-kicker">Sélection</p>
+        <h1>Eclipse Globe</h1>
+        <p class="subtitle">Choisis les éclipses à afficher. Recherche, tri, siècle et continent restent ici.</p>
       </div>
-
       <details id="catalogPanel" class="catalog" open>
-        <summary>
-          <span class="summary-text"><span>Catalogue NASA</span><small id="catalogCount">Chargement du catalogue…</small></span>
-        </summary>
+        <summary><span class="summary-text"><span>Catalogue NASA</span><small id="catalogCount">Chargement du catalogue…</small></span></summary>
         <div class="catalog-body">
           <div class="catalog-toolbar">
             <div class="filter-row">
@@ -172,14 +148,8 @@
               </select>
               <input id="catalogSearch" type="search" placeholder="Année, siècle, Saros, continent…" />
             </div>
-            <div class="bulk-actions">
-              <button id="showAllBtn" type="button">Tout afficher</button>
-              <button id="clearAllBtn" type="button">Tout masquer</button>
-            </div>
-            <div class="continent-actions">
-              <select id="continentSelect" aria-label="Choisir un continent"></select>
-              <button id="showContinentBtn" type="button">Afficher ce continent</button>
-            </div>
+            <div class="bulk-actions"><button id="showAllBtn" type="button">Tout afficher</button><button id="clearAllBtn" type="button">Tout masquer</button></div>
+            <div class="continent-actions"><select id="continentSelect" aria-label="Choisir un continent"></select><button id="showContinentBtn" type="button">Afficher ce continent</button></div>
           </div>
           <div id="catalogList" class="catalog-list"></div>
           <button id="loadMoreBtn" type="button" hidden>Afficher plus</button>
@@ -192,50 +162,29 @@
 
     <aside id="displayPanel" class="panel panel-right">
       <div class="panel-pad">
-        <div class="right-header">
-          <div><p class="panel-kicker">Vue</p><h2>Infos & affichage</h2></div>
-          <button id="rightPanelClose" class="icon-btn" type="button" aria-label="Fermer le panneau">×</button>
-        </div>
+        <div class="right-header"><div><p class="panel-kicker">Vue</p><h2>Infos & affichage</h2></div><button id="rightPanelClose" class="icon-btn" type="button" aria-label="Fermer">×</button></div>
 
         <section id="eclipseInfoCard" class="info-card" aria-live="polite">
-          <div id="eclipseInfoContent" class="info-empty">
-            <strong>Aucune éclipse pointée</strong>
-            Survole une bande sur le globe pour afficher ses informations. Sur mobile, touche une bande pour l’épingler ici.
-          </div>
+          <div id="eclipseInfoContent" class="info-empty"><strong>Aucune éclipse pointée</strong>Survole une bande sur le globe pour afficher ses informations. Sur mobile, touche une bande pour l’épingler ici.</div>
         </section>
 
         <section id="visibleEclipsesCard" class="visible-card">
           <div class="visible-head"><strong>Éclipses affichées</strong><span id="visibleEclipsesCount">0</span></div>
-          <div id="visibleEclipsesList" class="visible-list">
-            <div class="visible-empty">La sélection apparaîtra ici, par ordre chronologique.</div>
-          </div>
+          <div id="visibleEclipsesList" class="visible-list"><div class="visible-empty">La sélection apparaîtra ici, par ordre chronologique.</div></div>
         </section>
 
         <section class="settings-card">
           <p class="settings-title">Affichage</p>
-          <div class="action-grid">
-            <button id="focusBtn" type="button">Centrer sélection</button>
-            <button id="resetViewBtn" type="button">Vue globale</button>
-          </div>
+          <div class="action-grid"><button id="focusBtn" type="button">Centrer sélection</button><button id="resetViewBtn" type="button">Vue globale</button></div>
           <div class="toggle-row"><label for="bordersToggle">Frontières</label><input id="bordersToggle" type="checkbox" checked /></div>
           <div class="toggle-row"><label for="atmosphereToggle">Atmosphère</label><input id="atmosphereToggle" type="checkbox" checked /></div>
           <div class="toggle-row"><label for="centerLinesToggle">Lignes centrales</label><input id="centerLinesToggle" type="checkbox" checked /></div>
-          <div class="range-row">
-            <div class="range-label"><span>Opacité des bandes</span><span id="bandOpacityValue">74 %</span></div>
-            <input id="bandOpacity" type="range" min="15" max="100" value="74" step="1" />
-          </div>
+          <div class="range-row"><div class="range-label"><span>Opacité des bandes</span><span id="bandOpacityValue">74 %</span></div><input id="bandOpacity" type="range" min="15" max="100" value="74" step="1" /></div>
         </section>
 
-        <section class="stats-card">
-          <div class="stat"><strong id="selectedCount">0</strong><span>éclipses sélectionnées</span></div>
-          <div class="stat"><strong id="maxDuration">—</strong><span>totalité max.</span></div>
-        </section>
-
-        <div class="legend">
-          <span class="legend-chip"><i class="gradient-chip"></i>couleur = éclipse</span>
-          <span class="legend-chip"><i class="line-white"></i>frontières</span>
-        </div>
-        <div id="layerStatus" class="status">catalogue … · frontières … · build 14</div>
+        <section class="stats-card"><div class="stat"><strong id="selectedCount">0</strong><span>éclipses sélectionnées</span></div><div class="stat"><strong id="maxDuration">—</strong><span>totalité max.</span></div></section>
+        <div class="legend"><span class="legend-chip"><i class="gradient-chip"></i>couleur = éclipse</span><span class="legend-chip"><i class="line-white"></i>frontières</span></div>
+        <div id="layerStatus" class="status">catalogue … · frontières …</div>
         <div class="credit">Catalogue : NASA GSFC, Fred Espenak &amp; Jean Meeus. Clique une éclipse dans la liste de droite pour centrer la vue sur son maximum NASA.</div>
       </div>
     </aside>
@@ -245,7 +194,7 @@
 
   <script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
   <script src="./enhancements.js?v=14"></script>
-  <script src="./selection-list.js?v=15"></script>
+  <script src="./selection-list.js?v=16"></script>
   <script type="module" src="./app.js?v=14"></script>
 </body>
 </html>
