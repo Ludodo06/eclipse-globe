@@ -1,0 +1,11 @@
+{
+  "name": "eclipse-globe-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "serve": "python3 -m http.server 4173",
+    "check": "node --check app.js && node --check scripts/import-nasa.mjs"
+  }
+}
