@@ -43,14 +43,52 @@ jobs:
                   raise SystemExit(f'BUILD constant not found exactly once in {filename}')
               path.write_text(text, encoding='utf-8')
 
-          # Hover identity has one owner: enhancements.js.
-          # Use a high-precision RGB fingerprint instead of 8-bit rounding,
-          # and prevent selection-list.js from overwriting an existing key.
+          # Native eclipse identity: app.js writes the catalogue key directly into
+          # every ribbon vertex when the geometry is built. Hover never has to
+          # infer identity from color, position, selection order or loading order.
+          app = Path('app.js')
+          app_text = app.read_text(encoding='utf-8')
+          native_identity_replacements = [
+              (
+                  "eclipses = catalog.eclipses.map(meta => {",
+                  "eclipses = catalog.eclipses.map((meta, catalogIndex) => {"
+              ),
+              (
+                  "        ...meta,\n        displayDate: formatDate(meta),",
+                  "        ...meta,\n        _hoverKey: catalogIndex + 1,\n        displayDate: formatDate(meta),"
+              ),
+              (
+                  "  const colors = [];\n  const indices = [];",
+                  "  const colors = [];\n  const eclipseKeys = [];\n  const indices = [];"
+              ),
+              (
+                  "    const vertexOffset = positions.length / 3;\n\n    for (let i = 0; i < sampled.north.length; i += 1) {",
+                  "    const vertexOffset = positions.length / 3;\n    const hoverKey = Number(eclipse._hoverKey) || 0;\n\n    for (let i = 0; i < sampled.north.length; i += 1) {"
+              ),
+              (
+                  "      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);\n    }",
+                  "      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);\n      eclipseKeys.push(hoverKey, hoverKey);\n    }"
+              ),
+              (
+                  "  geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(colors, 3));\n  geometry.setIndex(indices);",
+                  "  geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(colors, 3));\n  geometry.setAttribute('aEclipseKey', new THREE.Float32BufferAttribute(eclipseKeys, 1));\n  geometry.setIndex(indices);"
+              ),
+          ]
+          for old, new in native_identity_replacements:
+              if old not in app_text:
+                  raise SystemExit(f'Native eclipse identity marker not found: {old[:70]!r}')
+              app_text = app_text.replace(old, new, 1)
+          app.write_text(app_text, encoding='utf-8')
+
+          # enhancements.js is the hover reader. Its color-based path is now only
+          # a legacy fallback for geometries that lack a native key.
           enhancements = Path('enhancements.js')
           enhancements_text = enhancements.read_text(encoding='utf-8')
           enhancements_text = enhancements_text.replace(' * 255)', ' * 1000000)')
           enhancements.write_text(enhancements_text, encoding='utf-8')
 
+          # selection-list.js may style/list selections, but must never overwrite
+          # the native key already written by app.js.
           selection_list = Path('selection-list.js')
           selection_text = selection_list.read_text(encoding='utf-8')
           repair_marker = "  function repairRibbonMesh(mesh) {\n    if (!state.colorsReady || !state.THREE) return;"
@@ -60,7 +98,6 @@ jobs:
           selection_text = selection_text.replace(repair_marker, repair_replacement, 1)
           selection_list.write_text(selection_text, encoding='utf-8')
 
-          app = Path('app.js')
           app_text = app.read_text(encoding='utf-8')
           app_hook = "\n".join([
               "",
