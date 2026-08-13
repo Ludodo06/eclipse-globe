@@ -48,16 +48,17 @@ jobs:
           for script in ('enhancements.js', 'selection-list.js', 'app.js'):
               text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
 
-          # Le nouveau sélecteur doit préparer le DOM avant selection-list.js et app.js.
-          selector_script = f'  <script src="./selector-ui.js?v={build}"></script>\n'
+          # Les modules d'interface préparent le DOM et les contrôles avant selection-list.js et app.js.
           marker = '  <script src="./selection-list.js?v='
-          if './selector-ui.js?v=' not in text:
-              position = text.find(marker)
-              if position < 0:
-                  raise SystemExit('selection-list script marker not found in index.html')
-              text = text[:position] + selector_script + text[position:]
-          else:
-              text = re.sub(r'(\./selector-ui\.js\?v=)\d+', rf'\g<1>{build}', text)
+          for script in ('selector-ui.js', 'panel-controls.js'):
+              script_tag = f'  <script src="./{script}?v={build}"></script>\n'
+              if f'./{script}?v=' not in text:
+                  position = text.find(marker)
+                  if position < 0:
+                      raise SystemExit('selection-list script marker not found in index.html')
+                  text = text[:position] + script_tag + text[position:]
+              else:
+                  text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
 
           # L'ancien correctif de molette n'est plus chargé : scroll natif du panneau entier.
           text = re.sub(r'^\s*<script src="\./panel-scroll\.js\?v=\d+"></script>\s*\n?', '', text, flags=re.M)
@@ -66,7 +67,7 @@ jobs:
           print(f'Deploying build {build}')
           PY
       - name: Check JavaScript syntax
-        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js
+        run: node --check app.js && node --check enhancements.js && node --check selection-list.js && node --check selector-ui.js && node --check panel-controls.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
