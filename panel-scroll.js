@@ -1,50 +1,39 @@
 (() => {
-  function installCatalogWheelScroll() {
+  function applySimpleNativeScroll() {
     const panel = document.getElementById('selectionPanel');
+    const catalog = document.getElementById('catalogPanel');
+    const body = panel?.querySelector('.catalog-body');
     const list = document.getElementById('catalogList');
-    if (!panel || !list || panel.__catalogWheelScrollInstalled) return;
+    if (!panel || !catalog || !body || !list) return;
 
-    panel.__catalogWheelScrollInstalled = true;
-    list.tabIndex = list.tabIndex >= 0 ? list.tabIndex : 0;
-    list.style.touchAction = 'pan-y';
-    list.style.overscrollBehavior = 'contain';
+    // Simple et natif : tout le panneau gauche défile comme une page normale.
+    panel.style.setProperty('display', 'block', 'important');
+    panel.style.setProperty('overflow-y', 'auto', 'important');
+    panel.style.setProperty('overflow-x', 'hidden', 'important');
+    panel.style.setProperty('overscroll-behavior', 'contain', 'important');
+    panel.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
 
-    panel.addEventListener('wheel', event => {
-      if (event.ctrlKey || event.metaKey) return;
+    catalog.style.setProperty('display', 'block', 'important');
+    catalog.style.setProperty('overflow', 'visible', 'important');
+    catalog.style.setProperty('min-height', '0', 'important');
 
-      const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
-      if (maxScroll <= 0) {
-        event.stopPropagation();
-        return;
-      }
+    body.style.setProperty('display', 'block', 'important');
+    body.style.setProperty('overflow', 'visible', 'important');
+    body.style.setProperty('min-height', '0', 'important');
 
-      let delta = event.deltaY;
-      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) delta *= 32;
-      else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) delta *= Math.max(1, list.clientHeight * 0.9);
-
-      if (!Number.isFinite(delta) || delta === 0) {
-        event.stopPropagation();
-        return;
-      }
-
-      const previous = list.scrollTop;
-      const next = Math.max(0, Math.min(maxScroll, previous + delta));
-      list.scrollTop = next;
-
-      // La molette appartient au catalogue tant que le pointeur est sur le panneau.
-      // On empêche OrbitControls de zoomer le globe derrière le menu.
-      event.preventDefault();
-      event.stopPropagation();
-    }, { passive: false, capture: true });
-
-    // Évite aussi que des listeners de molette ajoutés ensuite sur le document
-    // interprètent le geste comme un zoom du globe.
-    list.addEventListener('wheel', event => event.stopPropagation(), { passive: true });
+    list.style.setProperty('display', 'grid', 'important');
+    list.style.setProperty('height', 'auto', 'important');
+    list.style.setProperty('max-height', 'none', 'important');
+    list.style.setProperty('overflow', 'visible', 'important');
+    list.style.removeProperty('tab-index');
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installCatalogWheelScroll, { once: true });
-  } else {
-    installCatalogWheelScroll();
-  }
+  // Ce fichier est chargé avant selection-list.js et le script de layout.
+  // On applique donc le style après leur exécution pour rester le dernier mot.
+  requestAnimationFrame(() => {
+    applySimpleNativeScroll();
+    requestAnimationFrame(applySimpleNativeScroll);
+  });
+
+  window.addEventListener('resize', applySimpleNativeScroll, { passive: true });
 })();
