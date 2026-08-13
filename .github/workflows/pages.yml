@@ -25,6 +25,32 @@ jobs:
         uses: actions/checkout@v6
       - name: Build NASA total-eclipse catalog
         run: python scripts/build-nasa-catalog.py
+      - name: Inject deployment build number
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          build = os.environ['BUILD_NUMBER']
+
+          for filename in ('app.js', 'enhancements.js', 'selection-list.js'):
+              path = Path(filename)
+              text = path.read_text(encoding='utf-8')
+              text, count = re.subn(r'const BUILD = \d+;', f'const BUILD = {build};', text, count=1)
+              if count != 1:
+                  raise SystemExit(f'BUILD constant not found exactly once in {filename}')
+              path.write_text(text, encoding='utf-8')
+
+          index = Path('index.html')
+          text = index.read_text(encoding='utf-8')
+          for script in ('enhancements.js', 'selection-list.js', 'app.js'):
+              text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
+          index.write_text(text, encoding='utf-8')
+
+          print(f'Deploying build {build}')
+          PY
       - name: Check JavaScript syntax
         run: node --check app.js && node --check enhancements.js && node --check selection-list.js
       - name: Setup Pages
