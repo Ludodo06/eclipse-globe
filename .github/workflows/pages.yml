@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Build NASA total-eclipse catalog
         run: python scripts/build-nasa-catalog.py
-      - name: Inject deployment build number
+      - name: Prepare deployment
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
@@ -43,65 +43,52 @@ jobs:
                   raise SystemExit(f'BUILD constant not found exactly once in {filename}')
               path.write_text(text, encoding='utf-8')
 
-          # Une sélection filtrée est appliquée en une seule opération dans le moteur 3D.
           app = Path('app.js')
           app_text = app.read_text(encoding='utf-8')
-          app_text += r'''
+          app_hook = "\n".join([
+              "",
+              "document.addEventListener('eclipse-replace-selection', event => {",
+              "  const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];",
+              "  const requested = new Set(ids);",
+              "  selectedIds = new Set(eclipses.filter(eclipse => requested.has(eclipse.id)).map(eclipse => eclipse.id));",
+              "  selectedIds.forEach(id => lineAnimationRevision.set(id, (lineAnimationRevision.get(id) || 0) + 1));",
+              "  renderCatalog();",
+              "  applySelection();",
+              "});",
+              ""
+          ])
+          app.write_text(app_text + app_hook, encoding='utf-8')
 
-document.addEventListener('eclipse-replace-selection', event => {
-  const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
-  const requested = new Set(ids);
-  selectedIds = new Set(
-    eclipses.filter(eclipse => requested.has(eclipse.id)).map(eclipse => eclipse.id)
-  );
-  selectedIds.forEach(id => {
-    lineAnimationRevision.set(id, (lineAnimationRevision.get(id) || 0) + 1);
-  });
-  renderCatalog();
-  applySelection();
-});
-'''
-          app.write_text(app_text, encoding='utf-8')
+          def inject_before_iife_end(filename, lines):
+              path = Path(filename)
+              text = path.read_text(encoding='utf-8').rstrip()
+              if not text.endswith('})();'):
+                  raise SystemExit(f'{filename} ending not recognized')
+              hook = "\n".join(["", *lines, ""])
+              path.write_text(text[:-5] + hook + "\n})();\n", encoding='utf-8')
 
-          # Le panneau gauche garde son état de cases synchronisé avec la sélection groupée.
-          selector = Path('selector-ui.js')
-          selector_text = selector.read_text(encoding='utf-8')
-          selector_hook = r'''
+          inject_before_iife_end('selector-ui.js', [
+              "  document.addEventListener('eclipse-replace-selection', event => {",
+              "    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];",
+              "    state.selectedIds = new Set(ids);",
+              "    renderDetail();",
+              "  });"
+          ])
 
-  document.addEventListener('eclipse-replace-selection', event => {
-    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
-    state.selectedIds = new Set(ids);
-    renderDetail();
-  });
-'''
-          if not selector_text.rstrip().endswith('})();'):
-              raise SystemExit('selector-ui.js ending not recognized')
-          selector_text = selector_text.rstrip()[:-5] + selector_hook + '\n})();\n'
-          selector.write_text(selector_text, encoding='utf-8')
-
-          # La liste de droite se synchronise sans reconstruire l'identité des bandes.
-          selection_list = Path('selection-list.js')
-          selection_text = selection_list.read_text(encoding='utf-8')
-          selection_hook = r'''
-
-  document.addEventListener('eclipse-replace-selection', event => {
-    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];
-    state.selectedIds = new Set(ids.filter(id => state.byId.has(id)));
-    if (!state.selectedIds.has(state.focusedId)) state.focusedId = null;
-    renderSelection();
-  });
-'''
-          if not selection_text.rstrip().endswith('})();'):
-              raise SystemExit('selection-list.js ending not recognized')
-          selection_text = selection_text.rstrip()[:-5] + selection_hook + '\n})();\n'
-          selection_list.write_text(selection_text, encoding='utf-8')
+          inject_before_iife_end('selection-list.js', [
+              "  document.addEventListener('eclipse-replace-selection', event => {",
+              "    const ids = Array.isArray(event.detail?.ids) ? event.detail.ids : [];",
+              "    state.selectedIds = new Set(ids.filter(id => state.byId.has(id)));",
+              "    if (!state.selectedIds.has(state.focusedId)) state.focusedId = null;",
+              "    renderSelection();",
+              "  });"
+          ])
 
           index = Path('index.html')
           text = index.read_text(encoding='utf-8')
           for script in ('enhancements.js', 'selection-list.js', 'app.js'):
               text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
 
-          # Les modules d'interface préparent le DOM et les contrôles avant selection-list.js et app.js.
           marker = '  <script src="./selection-list.js?v='
           for script in ('selector-ui.js', 'panel-controls.js'):
               script_tag = f'  <script src="./{script}?v={build}"></script>\n'
@@ -113,9 +100,7 @@ document.addEventListener('eclipse-replace-selection', event => {
               else:
                   text = re.sub(rf'(\./{re.escape(script)}\?v=)\d+', rf'\g<1>{build}', text)
 
-          # L'ancien correctif de molette n'est plus chargé : scroll natif du panneau entier.
           text = re.sub(r'^\s*<script src="\./panel-scroll\.js\?v=\d+"></script>\s*\n?', '', text, flags=re.M)
-
           index.write_text(text, encoding='utf-8')
           print(f'Deploying build {build}')
           PY
