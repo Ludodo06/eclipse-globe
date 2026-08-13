@@ -1,15 +1,16 @@
 const EARTH_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
 const BUMP_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
 const COUNTRIES_GEOJSON = 'https://cdn.jsdelivr.net/gh/vasturiano/globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson';
-const ECLIPSE_FILES = ['./data/eclipses.json?v=8', './data/eclipse-2026.json?v=8'];
-const SUBDIVISIONS_PER_SOURCE_SEGMENT = 5;
+const ECLIPSE_FILES = ['./data/eclipses.json?v=9', './data/eclipse-2026.json?v=9'];
+const FADE_FRACTION = 0.10;
+const FADE_STEPS = 6;
 
 const dms = (deg, min, hemi) => {
   const value = Number(deg) + Number(min) / 60;
   return (hemi === 'S' || hemi === 'W') ? -value : value;
 };
 
-const toLatLng = (entry) => [
+const toLatLng = entry => [
   dms(entry.lat[0], entry.lat[1], entry.lat[2]),
   dms(entry.lon[0], entry.lon[1], entry.lon[2])
 ];
@@ -29,11 +30,21 @@ function interpolateLatLng(a, b, t) {
   return [lerp(a[0], b[0], t), lerpLng(a[1], b[1], t)];
 }
 
-function edgeAlpha(t) {
-  const fade = 0.10;
-  if (t <= fade) return clamp(t / fade, 0, 1);
-  if (t >= 1 - fade) return clamp((1 - t) / fade, 0, 1);
-  return 1;
+function pointAtProgress(points, progress) {
+  if (points.length === 1) return points[0];
+  const scaled = clamp(progress, 0, 1) * (points.length - 1);
+  const index = Math.min(points.length - 2, Math.floor(scaled));
+  return interpolateLatLng(points[index], points[index + 1], scaled - index);
+}
+
+function sliceEdge(points, start, end) {
+  const result = [pointAtProgress(points, start)];
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const progress = i / (points.length - 1);
+    if (progress > start && progress < end) result.push(points[i]);
+  }
+  result.push(pointAtProgress(points, end));
+  return result;
 }
 
 function eclipseLineColor(eclipse, index) {
@@ -42,55 +53,109 @@ function eclipseLineColor(eclipse, index) {
   return palette[index % palette.length];
 }
 
+function makeBandPolygon(eclipse, eclipseIndex, north, south, start, end, alpha, part) {
+  const northSlice = sliceEdge(north, start, end);
+  const southSlice = sliceEdge(south, start, end).reverse();
+  const ring = [
+    ...northSlice.map(([lat, lng]) => [lng, lat]),
+    ...southSlice.map(([lat, lng]) => [lng, lat])
+  ];
+  ring.push([...ring[0]]);
+
+  return {
+    kind: 'eclipse',
+    eclipseId: eclipse.id,
+    part,
+    alpha,
+    altitude: 0.0045 + eclipseIndex * 0.0006,
+    geometry: { type: 'Polygon', coordinates: [ring] }
+  };
+}
+
 function buildEclipseGeometry(eclipse, eclipseIndex) {
-  const rows = eclipse.path.filter(r => r.north && r.south && r.center);
-  const north = rows.map(r => toLatLng(r.north));
-  const south = rows.map(r => toLatLng(r.south));
-  const center = rows.map(r => toLatLng(r.center));
+  const rows = eclipse.path.filter(row => row.north && row.south && row.center);
+  const north = rows.map(row => toLatLng(row.north));
+  const south = rows.map(row => toLatLng(row.south));
+  const center = rows.map(row => toLatLng(row.center));
   const polygons = [];
 
-  for (let i = 0; i < rows.length - 1; i += 1) {
-    for (let sub = 0; sub < SUBDIVISIONS_PER_SOURCE_SEGMENT; sub += 1) {
-      const local0 = sub / SUBDIVISIONS_PER_SOURCE_SEGMENT;
-      const local1 = (sub + 1) / SUBDIVISIONS_PER_SOURCE_SEGMENT;
-      const progress0 = (i + local0) / (rows.length - 1);
-      const progress1 = (i + local1) / (rows.length - 1);
-      const progressMid = (progress0 + progress1) / 2;
-      const alpha = edgeAlpha(progressMid);
+  // One continuous mesh for the opaque 80% of the path.
+  polygons.push(makeBandPolygon(
+    eclipse,
+    eclipseIndex,
+    north,
+    south,
+    FADE_FRACTION,
+    1 - FADE_FRACTION,
+    1,
+    'core'
+  ));
 
-      const n0 = interpolateLatLng(north[i], north[i + 1], local0);
-      const n1 = interpolateLatLng(north[i], north[i + 1], local1);
-      const s0 = interpolateLatLng(south[i], south[i + 1], local0);
-      const s1 = interpolateLatLng(south[i], south[i + 1], local1);
+  // Only the first and last 10% are split into a few non-overlapping pieces.
+  // This approximates the requested alpha gradient without hundreds of tiny meshes.
+  for (let step = 0; step < FADE_STEPS; step += 1) {
+    const t0 = step / FADE_STEPS;
+    const t1 = (step + 1) / FADE_STEPS;
+    const alphaIn = (step + 0.5) / FADE_STEPS;
+    const alphaOut = 1 - alphaIn;
 
-      polygons.push({
-        kind: 'eclipse',
-        eclipseId: eclipse.id,
-        alpha,
-        altitude: 0.012 + eclipseIndex * 0.0012,
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            [n0[1], n0[0]],
-            [n1[1], n1[0]],
-            [s1[1], s1[0]],
-            [s0[1], s0[0]],
-            [n0[1], n0[0]]
-          ]]
-        }
-      });
-    }
+    polygons.push(makeBandPolygon(
+      eclipse,
+      eclipseIndex,
+      north,
+      south,
+      FADE_FRACTION * t0,
+      FADE_FRACTION * t1,
+      alphaIn,
+      'fade-in'
+    ));
+
+    polygons.push(makeBandPolygon(
+      eclipse,
+      eclipseIndex,
+      north,
+      south,
+      1 - FADE_FRACTION + FADE_FRACTION * t0,
+      1 - FADE_FRACTION + FADE_FRACTION * t1,
+      alphaOut,
+      'fade-out'
+    ));
   }
 
   return {
     polygons,
     paths: [{
+      kind: 'centerline',
       id: `${eclipse.id}-centerline`,
       color: eclipseLineColor(eclipse, eclipseIndex),
-      stroke: 0.62,
-      points: center.map(([lat, lng]) => ({ lat, lng, alt: 0.017 + eclipseIndex * 0.0012 }))
+      stroke: 0.52,
+      points: center.map(([lat, lng]) => ({ lat, lng, alt: 0.009 + eclipseIndex * 0.0006 }))
     }]
   };
+}
+
+function geometryToBorderPaths(geometry, featureIndex) {
+  if (!geometry) return [];
+  const polygons = geometry.type === 'Polygon'
+    ? [geometry.coordinates]
+    : geometry.type === 'MultiPolygon'
+      ? geometry.coordinates
+      : [];
+
+  const paths = [];
+  polygons.forEach((polygon, polygonIndex) => {
+    polygon.forEach((ring, ringIndex) => {
+      if (!Array.isArray(ring) || ring.length < 2) return;
+      paths.push({
+        kind: 'border',
+        id: `border-${featureIndex}-${polygonIndex}-${ringIndex}`,
+        color: 'rgba(255,255,255,0.82)',
+        stroke: 0.14,
+        points: ring.map(([lng, lat]) => ({ lat, lng, alt: 0.006 }))
+      });
+    });
+  });
+  return paths;
 }
 
 let bordersVisible = true;
@@ -102,13 +167,10 @@ const globe = Globe()(document.getElementById('globe'))
   .showAtmosphere(true)
   .atmosphereColor('#6ea9ff')
   .atmosphereAltitude(0.16)
-  .polygonCapColor(d => d.kind === 'eclipse' ? `rgba(0,0,0,${0.92 * d.alpha})` : 'rgba(0,0,0,0)')
-  .polygonSideColor(d => d.kind === 'eclipse' ? `rgba(0,0,0,${0.34 * d.alpha})` : 'rgba(0,0,0,0)')
-  .polygonStrokeColor(d => {
-    if (d.kind === 'eclipse') return 'rgba(0,0,0,0)';
-    return bordersVisible ? 'rgba(255,255,255,0.95)' : null;
-  })
-  .polygonAltitude(d => d.kind === 'eclipse' ? d.altitude : 0.004)
+  .polygonCapColor(d => d.kind === 'eclipse' ? `rgba(0,0,0,${d.alpha})` : 'rgba(0,0,0,0)')
+  .polygonSideColor(() => 'rgba(0,0,0,0)')
+  .polygonStrokeColor(() => null)
+  .polygonAltitude(d => d.altitude || 0.004)
   .polygonCapCurvatureResolution(1)
   .polygonsTransitionDuration(0)
   .pathPoints('points')
@@ -133,9 +195,9 @@ const layerStatus = document.getElementById('layerStatus');
 
 let eclipses = [];
 let selectedIds = new Set();
-let countryPolygons = [];
+let borderPaths = [];
 let activeEclipsePolygons = [];
-let activePaths = [];
+let activeEclipsePaths = [];
 let eclipseLoaded = false;
 let bordersLoaded = false;
 
@@ -149,27 +211,33 @@ function updateStatus() {
   if (!layerStatus) return;
   const visible = selectedIds.size;
   const eclipseText = eclipseLoaded ? `${visible}/${eclipses.length} éclipses` : 'éclipses …';
-  const borderText = bordersLoaded ? 'frontières ✓' : 'frontières …';
-  layerStatus.textContent = `${eclipseText} · ${borderText} · build 8`;
+  const borderText = bordersLoaded ? (bordersVisible ? 'frontières ✓' : 'frontières masquées') : 'frontières …';
+  layerStatus.textContent = `${eclipseText} · ${borderText} · build 9`;
 }
 
 function refreshPolygons() {
-  globe.polygonsData([...countryPolygons, ...activeEclipsePolygons]);
+  // The polygon layer is now reserved exclusively for eclipse bands.
+  globe.polygonsData(activeEclipsePolygons);
+}
+
+function refreshPaths() {
+  const visibleBorders = bordersVisible ? borderPaths : [];
+  globe.pathsData([...visibleBorders, ...activeEclipsePaths]);
 }
 
 function renderSelection({ focus = false } = {}) {
-  const visibleEclipses = eclipses.filter(e => selectedIds.has(e.id));
+  const visibleEclipses = eclipses.filter(eclipse => selectedIds.has(eclipse.id));
   activeEclipsePolygons = [];
-  activePaths = [];
+  activeEclipsePaths = [];
 
   visibleEclipses.forEach((eclipse, index) => {
     const geometry = buildEclipseGeometry(eclipse, index);
     activeEclipsePolygons.push(...geometry.polygons);
-    activePaths.push(...geometry.paths);
+    activeEclipsePaths.push(...geometry.paths);
   });
 
   refreshPolygons();
-  globe.pathsData(activePaths);
+  refreshPaths();
 
   selectedCount.textContent = String(visibleEclipses.length);
   const longest = visibleEclipses
@@ -192,11 +260,11 @@ function renderSelection({ focus = false } = {}) {
 }
 
 function focusOnSelection() {
-  const visible = eclipses.filter(e => selectedIds.has(e.id));
+  const visible = eclipses.filter(eclipse => selectedIds.has(eclipse.id));
   if (visible.length === 0) return;
 
-  const lat = visible.reduce((sum, e) => sum + e.focus[0], 0) / visible.length;
-  const lng = visible.reduce((sum, e) => sum + e.focus[1], 0) / visible.length;
+  const lat = visible.reduce((sum, eclipse) => sum + eclipse.focus[0], 0) / visible.length;
+  const lng = visible.reduce((sum, eclipse) => sum + eclipse.focus[1], 0) / visible.length;
   const altitude = visible.length === 1 ? 1.35 : Math.min(2.35, 1.75 + visible.length * 0.18);
   globe.pointOfView({ lat, lng, altitude }, 900);
 }
@@ -232,17 +300,19 @@ async function loadCountries() {
     const response = await fetch(COUNTRIES_GEOJSON, { mode: 'cors', cache: 'force-cache' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const geojson = await response.json();
-    countryPolygons = geojson.features
-      .filter(feature => feature.geometry && ['Polygon', 'MultiPolygon'].includes(feature.geometry.type))
-      .map(feature => ({ kind: 'country', geometry: feature.geometry, properties: feature.properties }));
+
+    borderPaths = geojson.features.flatMap((feature, featureIndex) =>
+      geometryToBorderPaths(feature.geometry, featureIndex)
+    );
 
     bordersLoaded = true;
-    refreshPolygons();
+    refreshPaths();
     updateStatus();
   } catch (err) {
     console.warn('Impossible de charger les frontières :', err);
     bordersToggle.checked = false;
     bordersToggle.disabled = true;
+    bordersVisible = false;
     const label = document.querySelector('label[for="bordersToggle"]');
     if (label) label.textContent = 'Frontières indisponibles';
     updateStatus();
@@ -263,13 +333,19 @@ async function loadEclipses() {
 
     if (eclipses.length === 0) throw new Error('Aucune éclipse disponible');
 
-    selectedIds = new Set(eclipses.map(e => e.id));
+    // Keep the original 2027 demo as the default view. The 2026 eclipse can
+    // be enabled independently or shown simultaneously with 2027.
+    const defaultId = eclipses.some(eclipse => eclipse.id === '2027-08-02-total')
+      ? '2027-08-02-total'
+      : eclipses[0].id;
+    selectedIds = new Set([defaultId]);
+
     renderEclipseControls();
     renderSelection({ focus: true });
   } catch (err) {
     console.error('Impossible de charger les éclipses :', err);
     subtitle.textContent = 'La Terre est chargée, mais les données des éclipses n’ont pas pu être récupérées.';
-    if (layerStatus) layerStatus.textContent = 'éclipses ✕ · frontières … · build 8';
+    if (layerStatus) layerStatus.textContent = 'éclipses ✕ · frontières … · build 9';
   }
 }
 
@@ -285,11 +361,8 @@ focusBtn.addEventListener('click', focusOnSelection);
 
 bordersToggle.addEventListener('change', () => {
   bordersVisible = bordersToggle.checked;
-  globe.polygonStrokeColor(d => {
-    if (d.kind === 'eclipse') return 'rgba(0,0,0,0)';
-    return bordersVisible ? 'rgba(255,255,255,0.95)' : null;
-  });
-  refreshPolygons();
+  refreshPaths();
+  updateStatus();
 });
 
 function resize() {
